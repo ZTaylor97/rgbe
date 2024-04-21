@@ -5,6 +5,8 @@ use context::{SDLContext, UpdateEvent};
 use emulator::Emulator;
 
 pub fn main() {
+    let rom_path = std::env::var("TEST_ROM_DIR").unwrap();
+    println!("{}", rom_path);
     let mut emulator = Emulator::new();
     let mut context = SDLContext::new();
 
