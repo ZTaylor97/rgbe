@@ -1,6 +1,8 @@
 #[derive(Default)]
 pub struct Memory {
-    registers: Registers,
+    registers: Registers, //0xFF00 - 0xFF7F
+                          // TODO: cart_bank_0: CartBank, // 0x0000 - 0x3FFF
+                          // cart_bank_1: CartBank, // 0x4000 - 0x7FFF
 }
 
 #[derive(Default)]
