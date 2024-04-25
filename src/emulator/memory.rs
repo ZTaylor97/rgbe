@@ -87,7 +87,7 @@ mod mem_tests {
         test_reg.a = 0xBF;
         test_reg.f = 0xF1;
 
-        assert_eq!(test_reg.get_af(), 0x1BF1 as u16);
+        assert_eq!(test_reg.get_af(), 0xBFF1 as u16);
     }
     #[test]
     fn test_set_af() {
