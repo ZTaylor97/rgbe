@@ -1,4 +1,5 @@
 mod cart;
+mod memory;
 
 use std::{fs::File, io::Read};
 
