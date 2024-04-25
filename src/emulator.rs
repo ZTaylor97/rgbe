@@ -11,7 +11,9 @@ pub struct Emulator {
 
 impl Emulator {
     pub fn new() -> Self {
-        Self { cart: Cart {} }
+        Self {
+            cart: Cart::default(),
+        }
     }
     pub fn load_rom(&mut self, rom_path: String) {
         let mut f = File::open(&rom_path).expect("File not found");
