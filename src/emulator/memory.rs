@@ -1,153 +1,76 @@
 use super::cart::RomBank;
 
+use super::cpu::{convert_two_u8s_to_u16, convert_u16_to_two_u8s};
+
 #[derive(Default)]
 pub struct Memory {
-    registers: Registers, //0xFF00 - 0xFF7F
-    cart_bank_0: RomBank, // 0x0000 - 0x3FFF
-    cart_bank_n: RomBank, // 0x4000 - 0x7FFF
-}
-
-#[derive(Default)]
-struct Registers {
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    f: u8,
-    h: u8,
-    l: u8,
-    sp: u16,
-    pc: u16,
-}
-
-impl Registers {
-    pub fn new() -> Self {
-        Registers::default()
-    }
-
-    pub fn get_af(&self) -> u16 {
-        convert_two_u8s_to_u16(self.a, self.f)
-    }
-    pub fn get_bc(&self) -> u16 {
-        convert_two_u8s_to_u16(self.b, self.c)
-    }
-    pub fn get_de(&self) -> u16 {
-        convert_two_u8s_to_u16(self.d, self.e)
-    }
-    pub fn get_hl(&self) -> u16 {
-        convert_two_u8s_to_u16(self.h, self.l)
-    }
-
-    pub fn set_af(&mut self, value: u16) {
-        (self.a, self.f) = convert_u16_to_two_u8s(value);
-    }
-    pub fn set_bc(&mut self, value: u16) {
-        (self.b, self.c) = convert_u16_to_two_u8s(value);
-    }
-    pub fn set_de(&mut self, value: u16) {
-        (self.d, self.e) = convert_u16_to_two_u8s(value);
-    }
-    pub fn set_hl(&mut self, value: u16) {
-        (self.h, self.l) = convert_u16_to_two_u8s(value);
-    }
-}
-
-pub fn convert_two_u8s_to_u16(first: u8, second: u8) -> u16 {
-    (first as u16) << 8 | second as u16
-}
-
-pub fn convert_u16_to_two_u8s(value: u16) -> (u8, u8) {
-    (((value & 0xFF00) >> 8) as u8, (value & 0xFF) as u8)
+    rom_0: RomBank,            // 0x0000 - 0x3FFF
+    rom_n: RomBank,            // 0x4000 - 0x7FFF
+    vram: VRAM,                //CGB switchable vram  0x8000 - 0x9FFF
+    work_ram_0: Ram,           // C000 - CFFF
+    work_ram_1: Ram,           // D000 - DFFF
+    echo_ram: Ram,             // E000 - FDFF unused
+    oam: OAM,                  // FE00 - FE9F
+    _unused: Ram,              // FEA0 - FEFF
+    io_reg: IORegisters,       // FF00 - FF7F
+    high_ram: Ram,             // FF80 - FFFE
+    interrupt_enable_reg: reg, // FFFF
 }
 
 impl Memory {
     fn new() -> Self {
         Self::default()
     }
+
+    fn read(address: u16) -> u16 {
+        match address {
+            0x0000..=0x3FFF => {
+                //TODO: rom_0
+            }
+            0x4000..=0x7FFF => {
+                //TODO: rom_n
+            }
+            0x8000..=0x9FFF => {
+                //TODO: vram
+            }
+            0xA000..=0xBFFF => {
+                //TODO: sram (from cartridge)
+            }
+            0xC000..=0xCFFF => {
+                //TODO: wram0
+            }
+            0xD000..=0xDFFF => {
+                //TODO: wram1 switchable in gbc mode
+            }
+            0xE000..=0xFDFF => {
+                //TODO: echo
+            }
+            0xFE00..=0xFE9F => {
+                //TODO: OAM
+            }
+            0xFEA0..=0xFEFF => {
+                //TODO:unused
+            }
+            0xFF00..=0xFF7F => {
+                //TODO:IO registers
+            }
+            0xFF80..=0xFFFE => {
+                //TODO:CPU RAM
+            }
+            0xFFFF => {
+                //TODO: Interrupt enable register
+            }
+        }
+
+        0
+    }
+
+    fn write_u8(value: u8, address: u16) {}
 }
+#[derive(Default)]
+pub struct IORegisters {}
+impl IORegisters {}
 
-#[cfg(test)]
-mod mem_tests {
-    use super::Registers;
-
-    #[test]
-    fn test_get_two_u8s_as_u16() {
-        let first = 0x1A;
-        let second = 0x00F1;
-        assert_eq!(super::convert_two_u8s_to_u16(first, second), 0x1AF1 as u16);
-    }
-    #[test]
-    fn test_get_two_u8s_from_u16() {
-        let test = 0x1FF1;
-        assert_eq!(super::convert_u16_to_two_u8s(test), (0x1F, 0x00F1));
-    }
-
-    #[test]
-    fn test_get_af() {
-        let mut test_reg = Registers::new();
-        test_reg.a = 0xBF;
-        test_reg.f = 0xF1;
-
-        assert_eq!(test_reg.get_af(), 0xBFF1 as u16);
-    }
-    #[test]
-    fn test_set_af() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_af(), 0);
-        test_reg.set_af(0x1371);
-        assert_eq!(test_reg.get_af(), 0x1371 as u16);
-    }
-
-    #[test]
-    fn test_get_bc() {
-        let mut test_reg = Registers::new();
-        test_reg.b = 0x1F;
-        test_reg.c = 0xF1;
-
-        assert_eq!(test_reg.get_bc(), 0x1FF1 as u16);
-    }
-    #[test]
-    fn test_set_bc() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_bc(), 0);
-        test_reg.set_bc(0x1FF1);
-        assert_eq!(test_reg.get_bc(), 0x1FF1 as u16);
-    }
-
-    #[test]
-    fn test_get_de() {
-        let mut test_reg = Registers::new();
-        test_reg.d = 0x1F;
-        test_reg.e = 0xF1;
-
-        assert_eq!(test_reg.get_de(), 0x1FF1 as u16);
-    }
-    #[test]
-    fn test_set_de() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_de(), 0);
-        test_reg.set_de(0x1FF1);
-        assert_eq!(test_reg.get_de(), 0x1FF1 as u16);
-    }
-
-    #[test]
-    fn test_get_hl() {
-        let mut test_reg = Registers::new();
-        test_reg.h = 0x1F;
-        test_reg.l = 0xF1;
-
-        assert_eq!(test_reg.get_hl(), 0x1FF1 as u16);
-    }
-    #[test]
-    fn test_set_hl() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_hl(), 0);
-        test_reg.set_hl(0x1FF1);
-        assert_eq!(test_reg.get_hl(), 0x1FF1 as u16);
-    }
-}
+#[derive(Default)]
+pub struct VRAM {}
+impl VRAM {}

@@ -1,10 +1,12 @@
 mod cart;
+mod cpu;
 mod memory;
 
 use std::{fs::File, io::Read};
 
 use cart::Cart;
 use memory::Memory;
+use sdl2::libc::wait;
 
 #[derive(Default)]
 pub struct Emulator {
@@ -13,12 +15,7 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new() -> Self {
-        Self {
-            cart: Cart::default(),
-            memory: Memory::default(),
-        }
-    }
+    pub fn update(&mut self) {}
 }
 
 #[derive(Default)]

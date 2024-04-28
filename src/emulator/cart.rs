@@ -1,5 +1,6 @@
 use std::{fs::File, io::Read};
 
+// TODO: carts may need to keep track of swappable bank state
 #[derive(Default)]
 pub struct Cart {
     buf: Vec<u8>,
@@ -30,6 +31,13 @@ impl Cart {
                 .try_into()
                 .unwrap(),
         }
+    }
+
+    pub fn read(&self, address: u16) -> u8 {
+        if address as usize > self.buf.len() {
+            return 0;
+        }
+        self.buf[address as usize]
     }
 }
 

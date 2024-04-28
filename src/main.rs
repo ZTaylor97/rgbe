@@ -17,7 +17,7 @@ pub fn main() {
             UpdateEvent::Stop => break 'running,
             _ => {}
         }
-
+        emulator.update();
         context.render()
     }
 }
