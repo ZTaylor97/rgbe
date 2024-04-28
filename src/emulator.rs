@@ -4,8 +4,11 @@ mod memory;
 use std::{fs::File, io::Read};
 
 use cart::Cart;
+use memory::Memory;
 
+#[derive(Default)]
 pub struct Emulator {
+    memory: Memory,
     cart: Cart,
 }
 
@@ -13,11 +16,33 @@ impl Emulator {
     pub fn new() -> Self {
         Self {
             cart: Cart::default(),
+            memory: Memory::default(),
         }
     }
-    pub fn load_rom(&mut self, rom_path: String) {
-        let mut f = File::open(&rom_path).expect("File not found");
-        let mut buf: Vec<u8> = vec![];
-        let size = f.read_to_end(&mut buf).expect("Error reading file");
+}
+
+#[derive(Default)]
+pub struct EmulatorBuilder {
+    cart: Cart,
+    memory: Memory,
+}
+
+impl EmulatorBuilder {
+    pub fn new() -> EmulatorBuilder {
+        EmulatorBuilder {
+            ..Default::default()
+        }
+    }
+
+    pub fn cart(mut self, file_path: String) -> EmulatorBuilder {
+        self.cart = Cart::load_rom(file_path);
+        self
+    }
+
+    pub fn build(self) -> Emulator {
+        Emulator {
+            memory: self.memory,
+            cart: self.cart,
+        }
     }
 }

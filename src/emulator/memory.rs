@@ -4,7 +4,7 @@ use super::cart::RomBank;
 pub struct Memory {
     registers: Registers, //0xFF00 - 0xFF7F
     cart_bank_0: RomBank, // 0x0000 - 0x3FFF
-    cart_bank_N: RomBank, // 0x4000 - 0x7FFF
+    cart_bank_n: RomBank, // 0x4000 - 0x7FFF
 }
 
 #[derive(Default)]

@@ -21,7 +21,6 @@ impl Cart {
         let mut buf: Vec<u8> = vec![];
         let size = f.read_to_end(&mut buf).expect("Error reading file");
 
-        println!("{size} == {}", buf.len());
         Cart { buf }
     }
 
