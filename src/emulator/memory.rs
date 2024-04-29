@@ -7,14 +7,14 @@ pub struct Memory {
     rom_0: RomBank,            // 0x0000 - 0x3FFF
     rom_n: RomBank,            // 0x4000 - 0x7FFF
     vram: VRAM,                //CGB switchable vram  0x8000 - 0x9FFF
-    work_ram_0: Ram,           // C000 - CFFF
-    work_ram_1: Ram,           // D000 - DFFF
-    echo_ram: Ram,             // E000 - FDFF unused
+    work_ram_0: RAM,           // C000 - CFFF
+    work_ram_1: RAM,           // D000 - DFFF
+    echo_ram: RAM,             // E000 - FDFF unused
     oam: OAM,                  // FE00 - FE9F
-    _unused: Ram,              // FEA0 - FEFF
+    _unused: RAM,              // FEA0 - FEFF
     io_reg: IORegisters,       // FF00 - FF7F
-    high_ram: Ram,             // FF80 - FFFE
-    interrupt_enable_reg: reg, // FFFF
+    high_ram: RAM,             // FF80 - FFFF
+    interrupt_enable_reg: , // FFFF
 }
 
 impl Memory {
@@ -22,16 +22,16 @@ impl Memory {
         Self::default()
     }
 
-    fn read(address: u16) -> u16 {
-        match address {
+    fn read_u8(&self, address: u16) -> u8 {
+        return match address {
             0x0000..=0x3FFF => {
-                //TODO: rom_0
+               self.rom_0.read_u8(address) 
             }
             0x4000..=0x7FFF => {
-                //TODO: rom_n
+                self.rom_n.read_u8(address - 0x4000)
             }
             0x8000..=0x9FFF => {
-                //TODO: vram
+                self.vram.read_u8(address - 0x8000)
             }
             0xA000..=0xBFFF => {
                 //TODO: sram (from cartridge)
@@ -55,22 +55,68 @@ impl Memory {
                 //TODO:IO registers
             }
             0xFF80..=0xFFFE => {
-                //TODO:CPU RAM
+                //TODO:CPU HRAM
             }
             0xFFFF => {
                 //TODO: Interrupt enable register
             }
         }
-
-        0
     }
 
-    fn write_u8(value: u8, address: u16) {}
+    fn read_u16(&self, address: u16) -> u16 {
+        (self.read_u8(address) as u16) | ((self.read_u8(address + 1) as u16) << 8)
+    }
+
+    fn write_u8(&mut self, value: u8, address: u16) {}
+
+    fn write_u16(&mut self, value: u8, address: u16) {}
 }
 #[derive(Default)]
 pub struct IORegisters {}
 impl IORegisters {}
 
-#[derive(Default)]
-pub struct VRAM {}
+pub struct VRAM {
+    buf: [u8; 0x1000]
+}
 impl VRAM {}
+impl Default for VRAM {
+    fn default() -> Self {
+        Self { buf: [0; 0x1000] }
+    }
+}
+
+impl ReadBuffer for VRAM {
+    fn read_u8(&self, address: u16) -> u8 {
+        *self
+            .buf
+            .get(address as usize)
+            .expect("Error reading Rom Buffer")
+    }
+
+    fn read_u16(&self, address: u16) ->u16 {
+        todo!()
+    }
+}
+
+
+#[derive(Default)]
+pub struct SRAM {}
+impl SRAM {}
+
+
+#[derive(Default)]
+pub struct HRAM {}
+impl HRAM {}
+
+pub trait ReadBuffer {
+    fn read_u8(&self, address: u16) -> u8{
+        0
+    }
+    fn read_u16(&self, address: u16) ->u16{
+        0
+    }
+}
+pub trait WriteBuffer {
+    fn write_u8() -> u8;
+    fn write_u16() ->u16;
+}

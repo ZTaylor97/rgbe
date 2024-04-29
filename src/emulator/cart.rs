@@ -1,5 +1,7 @@
 use std::{fs::File, io::Read};
 
+use super::memory::ReadBuffer;
+
 // TODO: carts may need to keep track of swappable bank state
 #[derive(Default)]
 pub struct Cart {
@@ -13,6 +15,19 @@ pub struct RomBank {
 impl Default for RomBank {
     fn default() -> Self {
         Self { buf: [0; 0x4000] }
+    }
+}
+
+impl ReadBuffer for RomBank {
+    fn read_u8(&self, address: u16) -> u8 {
+        *self
+            .buf
+            .get(address as usize)
+            .expect("Error reading Rom Buffer")
+    }
+
+    fn read_u16(&self, address: u16) -> u16 {
+        todo!()
     }
 }
 
