@@ -52,7 +52,7 @@ pub fn convert_u16_to_two_u8s(value: u16) -> (u8, u8) {
 }
 
 #[cfg(test)]
-mod mem_tests {
+mod cpu_tests {
     use super::CPURegisters;
 
     #[test]
