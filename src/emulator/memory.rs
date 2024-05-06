@@ -1,151 +1,163 @@
 #[derive(Default)]
 pub struct Memory {
-    registers: Registers, //0xFF00 - 0xFF7F
-                          // TODO: cart_bank_0: CartBank, // 0x0000 - 0x3FFF
-                          // cart_bank_1: CartBank, // 0x4000 - 0x7FFF
-}
-
-#[derive(Default)]
-struct Registers {
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    f: u8,
-    h: u8,
-    l: u8,
-    sp: u16,
-    pc: u16,
-}
-
-impl Registers {
-    pub fn new() -> Self {
-        Registers::default()
-    }
-
-    pub fn get_af(&self) -> u16 {
-        convert_two_u8s_to_u16(self.a, self.f)
-    }
-    pub fn get_bc(&self) -> u16 {
-        convert_two_u8s_to_u16(self.b, self.c)
-    }
-    pub fn get_de(&self) -> u16 {
-        convert_two_u8s_to_u16(self.d, self.e)
-    }
-    pub fn get_hl(&self) -> u16 {
-        convert_two_u8s_to_u16(self.h, self.l)
-    }
-
-    pub fn set_af(&mut self, value: u16) {
-        (self.a, self.f) = convert_u16_to_two_u8s(value);
-    }
-    pub fn set_bc(&mut self, value: u16) {
-        (self.b, self.c) = convert_u16_to_two_u8s(value);
-    }
-    pub fn set_de(&mut self, value: u16) {
-        (self.d, self.e) = convert_u16_to_two_u8s(value);
-    }
-    pub fn set_hl(&mut self, value: u16) {
-        (self.h, self.l) = convert_u16_to_two_u8s(value);
-    }
-}
-
-pub fn convert_two_u8s_to_u16(first: u8, second: u8) -> u16 {
-    (first as u16) << 8 | second as u16
-}
-
-pub fn convert_u16_to_two_u8s(value: u16) -> (u8, u8) {
-    (((value & 0xFF00) >> 8) as u8, (value & 0xFF) as u8)
+    rom_0: Buffer<0x4000>,      // 0x0000 - 0x3FFF
+    rom_n: Buffer<0x4000>,      // 0x4000 - 0x7FFF
+    vram: Buffer<0x2000>,       //CGB switchable vram  0x8000 - 0x9FFF
+    sram: Buffer<0x2000>,       // A000 - BFFF (cartridge RAM)
+    work_ram_0: Buffer<0x1000>, // C000 - CFFF
+    work_ram_n: Buffer<0x1000>, // D000 - DFFF
+    echo_ram: Buffer<0x1DFF>,   // E000 - FDFF unused
+    oam: Buffer<0x9F>,          // FE00 - FE9F
+    io_reg: IORegisters,        // FF00 - FF7F
+    high_ram: Buffer<0x7F>,     // FF80 - FFFF
 }
 
 impl Memory {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn read_u8(&self, address: u16) -> u8 {
+        return match address {
+            0x0000..=0x3FFF => self.rom_0.read_u8(address),
+            0x4000..=0x7FFF => self.rom_n.read_u8(address - 0x4000),
+            0x8000..=0x9FFF => self.vram.read_u8(address - 0x8000),
+            0xA000..=0xBFFF => self.sram.read_u8(address - 0xA000),
+            0xC000..=0xCFFF => self.work_ram_0.read_u8(address - 0xC000),
+            0xD000..=0xDFFF => self.work_ram_n.read_u8(address - 0xD000),
+            0xE000..=0xFDFF => self.echo_ram.read_u8(address - 0xE000),
+            0xFE00..=0xFE9F => self.oam.read_u8(address - 0xFE00),
+            0xFEA0..=0xFEFF => {
+                panic!("Unuseable memory accessed")
+            }
+            0xFF00..=0xFF7F => self.io_reg.read_u8(address - 0xFF00),
+            0xFF80..=0xFFFF => self.high_ram.read_u8(address - 0xFF80),
+        };
+    }
+
+    pub fn read_u16(&self, address: u16) -> u16 {
+        (self.read_u8(address) as u16) | ((self.read_u8(address + 1) as u16) << 8)
+    }
+
+    pub fn write_u8(&mut self, address: u16, value: u8) {
+        match address {
+            0x0000..=0x3FFF => self.rom_0.write_u8(address, value),
+            0x4000..=0x7FFF => self.rom_n.write_u8(address - 0x4000, value),
+            0x8000..=0x9FFF => self.vram.write_u8(address - 0x8000, value),
+            0xA000..=0xBFFF => self.sram.write_u8(address - 0xA000, value),
+            0xC000..=0xCFFF => self.work_ram_0.write_u8(address - 0xC000, value),
+            0xD000..=0xDFFF => self.work_ram_n.write_u8(address - 0xD000, value),
+            0xE000..=0xFDFF => self.echo_ram.write_u8(address - 0xE000, value),
+            0xFE00..=0xFE9F => self.oam.write_u8(address - 0xFE00, value),
+            0xFEA0..=0xFEFF => {
+                panic!("Unuseable memory accessed")
+            }
+            0xFF00..=0xFF7F => self.io_reg.write_u8(address - 0xFF00, value),
+            0xFF80..=0xFFFF => self.high_ram.write_u8(address - 0xFF80, value),
+        }
+    }
+
+    pub fn write_u16(&mut self, address: u16, value: u16) {
+        self.write_u8(address, (value & 0x00ff) as u8);
+        self.write_u8(address + 1, ((value & 0xff00) >> 8) as u8);
     }
 }
 
+// TODO: implement IO registers properly, might be worth putting them in another module
+pub struct IORegisters {
+    buf: [u8; 0x100],
+}
+impl Default for IORegisters {
+    fn default() -> Self {
+        Self { buf: [0; 0x100] }
+    }
+}
+impl ReadBuffer for IORegisters {
+    fn read_u8(&self, address: u16) -> u8 {
+        *self
+            .buf
+            .get(address as usize)
+            .expect("Error reading Rom Buffer")
+    }
+}
+impl WriteBuffer for IORegisters {
+    fn write_u8(&mut self, address: u16, value: u8) {
+        self.buf[address as usize] = value;
+    }
+}
+
+pub struct Buffer<const N: usize> {
+    pub buf: [u8; N],
+}
+impl<const N: usize> Default for Buffer<N> {
+    fn default() -> Self {
+        Buffer { buf: [0; N] }
+    }
+}
+impl<const N: usize> ReadBuffer for Buffer<N> {
+    fn read_u8(&self, address: u16) -> u8 {
+        *self.buf.get(address as usize).expect("")
+    }
+}
+impl<const N: usize> WriteBuffer for Buffer<N> {
+    fn write_u8(&mut self, address: u16, value: u8) {
+        if let Some(x) = self.buf.get_mut(address as usize) {
+            *x = value;
+        } else {
+            panic!(
+                "Index {address} into Buffer out of bounds, length is {}",
+                self.buf.len()
+            )
+        }
+    }
+}
+
+pub trait ReadBuffer {
+    fn read_u8(&self, address: u16) -> u8;
+}
+pub trait WriteBuffer {
+    fn write_u8(&mut self, address: u16, value: u8);
+}
+
 #[cfg(test)]
-mod mem_tests {
-    use super::Registers;
+mod memory_tests {
+    use super::Memory;
 
     #[test]
-    fn test_get_two_u8s_as_u16() {
-        let first = 0x1A;
-        let second = 0x00F1;
-        assert_eq!(super::convert_two_u8s_to_u16(first, second), 0x1AF1 as u16);
-    }
-    #[test]
-    fn test_get_two_u8s_from_u16() {
-        let test = 0x1FF1;
-        assert_eq!(super::convert_u16_to_two_u8s(test), (0x1F, 0x00F1));
-    }
+    fn test_get_u8() {
+        let mut test_memory = Memory::new();
 
-    #[test]
-    fn test_get_af() {
-        let mut test_reg = Registers::new();
-        test_reg.a = 0xBF;
-        test_reg.f = 0xF1;
+        test_memory.rom_0.buf[0x0000] = 69;
+        test_memory.rom_n.buf[0x0000] = 42;
 
-        assert_eq!(test_reg.get_af(), 0xBFF1 as u16);
-    }
-    #[test]
-    fn test_set_af() {
-        let mut test_reg = Registers::new();
+        assert_eq!(test_memory.read_u8(0x0000), 69);
+        assert_eq!(test_memory.read_u8(0x4000), 42);
 
-        assert_eq!(test_reg.get_af(), 0);
-        test_reg.set_af(0x1371);
-        assert_eq!(test_reg.get_af(), 0x1371 as u16);
+        // TODO: coverage of all memory blocks, including edge cases
     }
 
     #[test]
-    fn test_get_bc() {
-        let mut test_reg = Registers::new();
-        test_reg.b = 0x1F;
-        test_reg.c = 0xF1;
+    fn test_get_u16() {
+        let mut test_memory = Memory::new();
+        test_memory.rom_0.buf[0] = 0xFA;
+        test_memory.rom_0.buf[1] = 0xAF;
 
-        assert_eq!(test_reg.get_bc(), 0x1FF1 as u16);
-    }
-    #[test]
-    fn test_set_bc() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_bc(), 0);
-        test_reg.set_bc(0x1FF1);
-        assert_eq!(test_reg.get_bc(), 0x1FF1 as u16);
+        assert_eq!(test_memory.read_u16(0), 0xAFFA)
+        // TODO: coverage of all memory blocks, including edge cases
     }
 
     #[test]
-    fn test_get_de() {
-        let mut test_reg = Registers::new();
-        test_reg.d = 0x1F;
-        test_reg.e = 0xF1;
-
-        assert_eq!(test_reg.get_de(), 0x1FF1 as u16);
-    }
-    #[test]
-    fn test_set_de() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_de(), 0);
-        test_reg.set_de(0x1FF1);
-        assert_eq!(test_reg.get_de(), 0x1FF1 as u16);
+    fn test_write_u8() {
+        let mut test_memory = Memory::new();
+        test_memory.write_u8(0, 69);
+        assert_eq!(test_memory.rom_0.buf[0], 69);
     }
 
     #[test]
-    fn test_get_hl() {
-        let mut test_reg = Registers::new();
-        test_reg.h = 0x1F;
-        test_reg.l = 0xF1;
-
-        assert_eq!(test_reg.get_hl(), 0x1FF1 as u16);
-    }
-    #[test]
-    fn test_set_hl() {
-        let mut test_reg = Registers::new();
-
-        assert_eq!(test_reg.get_hl(), 0);
-        test_reg.set_hl(0x1FF1);
-        assert_eq!(test_reg.get_hl(), 0x1FF1 as u16);
+    fn test_write_u16() {
+        let mut test_memory = Memory::new();
+        test_memory.write_u16(0, 0xAFFA);
+        assert_eq!(test_memory.rom_0.buf[0], 0xFA);
+        assert_eq!(test_memory.rom_0.buf[1], 0xAF);
     }
 }
