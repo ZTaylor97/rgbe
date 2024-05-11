@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 #[derive(Default)]
 pub struct Memory {
     rom_0: Buffer<0x4000>,      // 0x0000 - 0x3FFF
@@ -17,6 +19,23 @@ impl Memory {
         Self::default()
     }
 
+    pub fn read_u8_mut(&mut self, address: u16) -> &mut u8 {
+        return match address {
+            0x0000..=0x3FFF => self.rom_0.read_u8_mut(address),
+            0x4000..=0x7FFF => self.rom_n.read_u8_mut(address - 0x4000),
+            0x8000..=0x9FFF => self.vram.read_u8_mut(address - 0x8000),
+            0xA000..=0xBFFF => self.sram.read_u8_mut(address - 0xA000),
+            0xC000..=0xCFFF => self.work_ram_0.read_u8_mut(address - 0xC000),
+            0xD000..=0xDFFF => self.work_ram_n.read_u8_mut(address - 0xD000),
+            0xE000..=0xFDFF => self.echo_ram.read_u8_mut(address - 0xE000),
+            0xFE00..=0xFE9F => self.oam.read_u8_mut(address - 0xFE00),
+            0xFEA0..=0xFEFF => {
+                panic!("Unuseable memory accessed")
+            }
+            0xFF00..=0xFF7F => self.io_reg.read_u8_mut(address - 0xFF00),
+            0xFF80..=0xFFFF => self.high_ram.read_u8_mut(address - 0xFF80),
+        };
+    }
     pub fn read_u8(&self, address: u16) -> u8 {
         return match address {
             0x0000..=0x3FFF => self.rom_0.read_u8(address),
@@ -73,11 +92,13 @@ impl Default for IORegisters {
     }
 }
 impl ReadBuffer for IORegisters {
-    fn read_u8(&self, address: u16) -> u8 {
-        *self
-            .buf
-            .get(address as usize)
+    fn read_u8_mut(&mut self, address: u16) -> &mut u8 {
+        self.buf
+            .get_mut(address as usize)
             .expect("Error reading Rom Buffer")
+    }
+    fn read_u8(&self, address: u16) -> u8 {
+        *self.buf.get(address as usize).expect("")
     }
 }
 impl WriteBuffer for IORegisters {
@@ -95,8 +116,11 @@ impl<const N: usize> Default for Buffer<N> {
     }
 }
 impl<const N: usize> ReadBuffer for Buffer<N> {
+    fn read_u8_mut(&mut self, address: u16) -> &mut u8 {
+        self.buf.get_mut(address as usize).expect("")
+    }
     fn read_u8(&self, address: u16) -> u8 {
-        *self.buf.get(address as usize).expect("")
+        self.buf.get(address as usize).expect("").clone()
     }
 }
 impl<const N: usize> WriteBuffer for Buffer<N> {
@@ -113,6 +137,7 @@ impl<const N: usize> WriteBuffer for Buffer<N> {
 }
 
 pub trait ReadBuffer {
+    fn read_u8_mut(&mut self, address: u16) -> &mut u8;
     fn read_u8(&self, address: u16) -> u8;
 }
 pub trait WriteBuffer {

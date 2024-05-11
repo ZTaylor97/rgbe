@@ -1,23 +1,31 @@
 use num_traits::NumAssignRef;
 
-pub struct Instruction<T: NumAssignRef> {
-    mnemonic: String,
-    bytes: u8,
-    cycles: u8,
-    func: fn(Operands<T>) -> (),
-}
-pub enum Operands<'a, T: NumAssignRef> {
+pub enum Operands<'a> {
     None,
-    One(T),
-    OneMut(&'a mut T),
-    Two(T, T),
-    TwoOneMut(&'a mut T, T),
-    TwoMut(&'a mut T, &'a mut T),
+    One(Word<'a>),
+    Two(Word<'a>, Word<'a>),
 }
-impl<T> Default for Instruction<T>
-where
-    T: NumAssignRef,
-{
+
+pub enum Word<'a> {
+    U8(u8),
+    U8Mut(&'a mut u8),
+    U16(u16),
+    U16Mut(&'a mut u16),
+}
+
+pub enum Ret {
+    U8(u8),
+    U16(u16),
+}
+
+pub struct Instruction {
+    pub mnemonic: String,
+    pub bytes: u8,
+    pub cycles: u8,
+    func: fn(Operands) -> Option<Ret>,
+}
+
+impl Default for Instruction {
     fn default() -> Self {
         Self {
             mnemonic: String::default(),
@@ -28,24 +36,39 @@ where
     }
 }
 
-impl<T: NumAssignRef> Instruction<T> {
-    fn exec(&mut self, params: Operands<T>) {
+impl Instruction {
+    pub fn exec(&self, params: Operands) -> Option<Ret> {
         (self.func)(params)
     }
 }
 
-pub fn nop<T: NumAssignRef>(operands: Operands<'_, T>) -> () {}
+pub fn get_instruction(idx: u8) -> Instruction {
+    todo!("Implement instruction fetching")
+}
 
-pub fn ld_rx_rx<T: NumAssignRef>(operands: Operands<'_, T>) {
-    if let Operands::TwoOneMut(x, y) = operands {
-        *x = y
+pub fn nop(operands: Operands<'_>) -> Option<Ret> {
+    None
+}
+
+pub fn ld(operands: Operands<'_>) -> Option<Ret> {
+    if let Operands::Two(target, source) = operands {
+        match (target, source) {
+            (Word::U8Mut(target), Word::U8(source)) => {
+                *target = source;
+            }
+            (Word::U16Mut(target), Word::U16(source)) => {
+                *target = source;
+            }
+            _ => panic!("Invalid operands"),
+        }
     }
+    None
 }
 
 #[cfg(test)]
 mod instruction_tests {
 
-    use crate::emulator::instructions::{Instruction, Operands};
+    use crate::emulator::instructions::{Instruction, Operands, Word};
 
     #[test]
     fn test_ld_r8_r8() {
@@ -56,13 +79,15 @@ mod instruction_tests {
             mnemonic: Default::default(),
             bytes: 0,
             cycles: 4,
-            func: super::ld_rx_rx,
+            func: super::ld,
         };
 
-        instruction.exec(Operands::TwoOneMut(&mut target, source));
+        instruction.exec(Operands::Two(Word::U8Mut(&mut target), Word::U8(source)));
 
         assert_eq!(target, source)
     }
+
+    #[test]
     fn test_ld_r16_r16() {
         let source = 30000;
         let mut target = 0;
@@ -71,10 +96,10 @@ mod instruction_tests {
             mnemonic: Default::default(),
             bytes: 0,
             cycles: 4,
-            func: super::ld_rx_rx,
+            func: super::ld,
         };
 
-        instruction.exec(Operands::TwoOneMut(&mut target, source));
+        instruction.exec(Operands::Two(Word::U16Mut(&mut target), Word::U16(source)));
         assert_eq!(target, source)
     }
 }
