@@ -61,6 +61,8 @@ pub fn ld(operands: Operands<'_>) -> Option<Ret> {
             }
             _ => panic!("Invalid operands"),
         }
+    } else {
+        panic!("Incorrect number of operands")
     }
     None
 }

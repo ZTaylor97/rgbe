@@ -40,11 +40,11 @@ impl CPU {
         let hi = opcode & 0xF0 >> 4;
         let lo = opcode & 0x0F;
 
+        let reg_copy = self.registers.clone();
         // When in that nice block of load instructions
         if let 0x40..=0x7F = opcode {
             let hl = self.registers.get_hl();
             let mem_hl_val = mem.read_u8(hl).clone();
-            let reg_copy = self.registers.clone();
 
             let dest = match hi {
                 0x4 => {
@@ -128,6 +128,36 @@ impl CPU {
                         _ => panic!("Not Implemented!"),
                     }
                 }
+                0xA => match hi {
+                    0x0 => Operands::Two(
+                        Word::U8Mut(&mut self.registers.a),
+                        Word::U8(mem.read_u8(reg_copy.get_bc())),
+                    ),
+                    0x1 => Operands::Two(
+                        Word::U8Mut(&mut self.registers.a),
+                        Word::U8(mem.read_u8(reg_copy.get_de())),
+                    ),
+                    0x2 => {
+                        let hl = reg_copy.get_hl();
+                        let ops = Operands::Two(
+                            Word::U8Mut(&mut self.registers.a),
+                            Word::U8(mem.read_u8(hl)),
+                        );
+                        self.registers.set_hl(hl + 1);
+                        ops
+                    }
+                    0x3 => {
+                        let hl = self.registers.get_hl();
+                        let ops = Operands::Two(
+                            Word::U8Mut(&mut self.registers.a),
+                            Word::U8(mem.read_u8(hl)),
+                        );
+                        self.registers.set_hl(hl + 1);
+                        ops
+                    }
+                    _ => panic!("Not Implemented!"),
+                },
+
                 _ => panic!("Not implemented!"),
             }
         }
