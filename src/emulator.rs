@@ -24,6 +24,7 @@ impl Emulator {
 pub struct EmulatorBuilder {
     cart: Cart,
     memory: Memory,
+    cpu: CPU,
 }
 
 impl EmulatorBuilder {

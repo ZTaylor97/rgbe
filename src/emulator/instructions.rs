@@ -1,5 +1,7 @@
 use num_traits::NumAssignRef;
 
+use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
+
 pub enum Operands<'a> {
     None,
     One(Word<'a>),
@@ -42,7 +44,30 @@ impl Instruction {
     }
 }
 
-pub fn get_instruction(idx: u8) -> Instruction {
+pub fn execute_instruction(registers: &mut CPURegisters, memory: &mut Memory) {
+    let instruction = Instruction {
+        mnemonic: String::from("LD"),
+        bytes: 1,
+        cycles: 4,
+        func: ld,
+    };
+
+    let opcode = memory.read_u8(registers.pc);
+    registers.pc += 1;
+
+    let value = match instruction.bytes {
+        1 => None,
+        2 => Some(Ret::U8(memory.read_u8(registers.pc + 1))),
+        3 => Some(Ret::U16(memory.read_u16(registers.pc + 1))),
+        _ => panic!("Bytes is invalid"),
+    };
+
+    let operands = get_ld_operands(registers, memory, opcode, value);
+
+    instruction.exec(operands);
+
+    registers.pc += instruction.bytes as u16;
+
     todo!("Implement instruction fetching")
 }
 
@@ -67,6 +92,202 @@ pub fn ld(operands: Operands<'_>) -> Option<Ret> {
     None
 }
 
+pub fn get_ld_operands<'a>(
+    registers: &'a mut CPURegisters,
+    mem: &'a mut Memory,
+    opcode: u8,
+    value: Option<Ret>,
+) -> Operands<'a> {
+    let hi = opcode & 0xF0 >> 4;
+    let lo = opcode & 0x0F;
+
+    let reg_copy = registers.clone();
+    // When in that nice block of load instructions
+    if let 0x40..=0x7F = opcode {
+        let hl = registers.get_hl();
+        let mem_hl_val = mem.read_u8(hl).clone();
+
+        let dest = match hi {
+            0x4 => {
+                if lo <= 0x7 {
+                    Word::U8Mut(&mut registers.b)
+                } else {
+                    Word::U8Mut(&mut registers.c)
+                }
+            }
+            0x5 => {
+                if lo <= 0x7 {
+                    Word::U8Mut(&mut registers.d)
+                } else {
+                    Word::U8Mut(&mut registers.e)
+                }
+            }
+            0x6 => {
+                if lo <= 0x7 {
+                    Word::U8Mut(&mut registers.h)
+                } else {
+                    Word::U8Mut(&mut registers.l)
+                }
+            }
+            0x7 => {
+                if lo <= 0x7 {
+                    Word::U8Mut(mem.read_u8_mut(hl))
+                } else {
+                    Word::U8Mut(&mut registers.a)
+                }
+            }
+            _ => panic!("Not implemented!"),
+        };
+
+        match lo {
+            0x0 => Operands::Two(dest, Word::U8(reg_copy.b)),
+            0x1 => Operands::Two(dest, Word::U8(reg_copy.c)),
+            0x2 => Operands::Two(dest, Word::U8(reg_copy.d)),
+            0x3 => Operands::Two(dest, Word::U8(reg_copy.e)),
+            0x4 => Operands::Two(dest, Word::U8(reg_copy.h)),
+            0x5 => Operands::Two(dest, Word::U8(reg_copy.l)),
+            0x6 => Operands::Two(dest, Word::U8(mem_hl_val)),
+            0x7 => Operands::Two(dest, Word::U8(reg_copy.a)),
+            0x8 => Operands::Two(dest, Word::U8(reg_copy.b)),
+            0x9 => Operands::Two(dest, Word::U8(reg_copy.c)),
+            0xA => Operands::Two(dest, Word::U8(reg_copy.d)),
+            0xB => Operands::Two(dest, Word::U8(reg_copy.e)),
+            0xC => Operands::Two(dest, Word::U8(reg_copy.h)),
+            0xD => Operands::Two(dest, Word::U8(reg_copy.l)),
+            0xE => Operands::Two(dest, Word::U8(mem_hl_val)),
+            0xF => Operands::Two(dest, Word::U8(reg_copy.a)),
+            _ => panic!("Not implemented"),
+        }
+    } else {
+        match lo {
+            0x0 => {
+                let value = if let Some(Ret::U8(x)) = value {
+                    x
+                } else {
+                    panic!("Numeric Value not passed");
+                };
+
+                match hi {
+                    0xE => Operands::Two(
+                        Word::U8Mut(mem.read_u8_mut(value as u16)),
+                        Word::U8(registers.a),
+                    ),
+                    0xF => Operands::Two(
+                        Word::U8Mut(&mut registers.a),
+                        Word::U8(mem.read_u8(value as u16)),
+                    ),
+                    _ => panic!("Not implemented!"),
+                }
+            }
+            0x2 => {
+                let source = registers.a;
+
+                match hi {
+                    0x0 => Operands::Two(
+                        Word::U8Mut(mem.read_u8_mut(registers.get_bc())),
+                        Word::U8(source),
+                    ),
+                    0x1 => Operands::Two(
+                        Word::U8Mut(mem.read_u8_mut(registers.get_de())),
+                        Word::U8(source),
+                    ),
+                    0x2 => {
+                        let hl = registers.get_hl();
+                        let ops = Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source));
+                        registers.set_hl(hl + 1);
+                        ops
+                    }
+                    0x3 => {
+                        let hl = registers.get_hl();
+                        let ops = Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source));
+                        registers.set_hl(hl - 1);
+                        ops
+                    }
+                    0xE => Operands::Two(
+                        Word::U8Mut(mem.read_u8_mut(registers.c as u16)),
+                        Word::U8(source),
+                    ),
+                    0xF => Operands::Two(
+                        Word::U8Mut(mem.read_u8_mut(source as u16)),
+                        Word::U8(registers.c),
+                    ),
+                    _ => panic!("Not Implemented!"),
+                }
+            }
+            0xA => match hi {
+                0x0 => Operands::Two(
+                    Word::U8Mut(&mut registers.a),
+                    Word::U8(mem.read_u8(reg_copy.get_bc())),
+                ),
+                0x1 => Operands::Two(
+                    Word::U8Mut(&mut registers.a),
+                    Word::U8(mem.read_u8(reg_copy.get_de())),
+                ),
+                0x2 => {
+                    let hl = reg_copy.get_hl();
+                    registers.set_hl(hl + 1);
+                    let ops =
+                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
+                    ops
+                }
+                0x3 => {
+                    let hl = registers.get_hl();
+                    registers.set_hl(hl + 1);
+                    let ops =
+                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
+                    ops
+                }
+                0xE => {
+                    let value: u16 = if let Some(Ret::U16(x)) = value {
+                        x
+                    } else {
+                        panic!("Numeric Value not passed");
+                    };
+
+                    Operands::Two(Word::U8Mut(mem.read_u8_mut(value)), Word::U8(registers.a))
+                }
+                0xF => {
+                    let value: u16 = if let Some(Ret::U16(x)) = value {
+                        x
+                    } else {
+                        panic!("Numeric Value not passed");
+                    };
+
+                    Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(value)))
+                }
+                _ => panic!("Not Implemented!"),
+            },
+
+            0xE => match hi {
+                0x0 => Operands::Two(
+                    Word::U8Mut(&mut registers.c),
+                    Word::U8(mem.read_u8(reg_copy.get_bc())),
+                ),
+                0x1 => Operands::Two(
+                    Word::U8Mut(&mut registers.e),
+                    Word::U8(mem.read_u8(reg_copy.get_de())),
+                ),
+                0x2 => {
+                    let hl = reg_copy.get_hl();
+                    registers.set_hl(hl + 1);
+                    let ops =
+                        Operands::Two(Word::U8Mut(&mut registers.l), Word::U8(mem.read_u8(hl)));
+                    ops
+                }
+                0x3 => {
+                    let hl = registers.get_hl();
+                    registers.set_hl(hl + 1);
+                    let ops =
+                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
+                    ops
+                }
+                _ => panic!("Not Implemented!"),
+            },
+            _ => panic!("Not implemented!"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod instruction_tests {
 
@@ -77,7 +298,7 @@ mod instruction_tests {
         let source = 10;
         let mut target = 0;
 
-        let mut instruction = Instruction {
+        let instruction = Instruction {
             mnemonic: Default::default(),
             bytes: 0,
             cycles: 4,
@@ -94,7 +315,7 @@ mod instruction_tests {
         let source = 30000;
         let mut target = 0;
 
-        let mut instruction = Instruction {
+        let instruction = Instruction {
             mnemonic: Default::default(),
             bytes: 0,
             cycles: 4,
