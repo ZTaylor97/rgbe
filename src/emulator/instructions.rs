@@ -45,15 +45,23 @@ impl Instruction {
 }
 
 pub fn execute_instruction(registers: &mut CPURegisters, memory: &mut Memory) {
-    let instruction = Instruction {
-        mnemonic: String::from("LD"),
-        bytes: 1,
-        cycles: 4,
-        func: ld,
+    let opcode = memory.read_u8(registers.pc);
+    let instruction = match opcode {
+        0xEA => Instruction {
+            mnemonic: String::from("LD"),
+            bytes: 3,
+            cycles: 4,
+            func: ld,
+        },
+        _ => Instruction {
+            mnemonic: String::from("LD"),
+            bytes: 1,
+            cycles: 4,
+            func: ld,
+        },
     };
 
     let opcode = memory.read_u8(registers.pc);
-    registers.pc += 1;
 
     let value = match instruction.bytes {
         1 => None,
@@ -66,9 +74,9 @@ pub fn execute_instruction(registers: &mut CPURegisters, memory: &mut Memory) {
 
     instruction.exec(operands);
 
-    registers.pc += instruction.bytes as u16;
+    registers.pc += (instruction.bytes + 1) as u16;
 
-    todo!("Implement instruction fetching")
+    // TODO: todo!("Implement instruction fetching")
 }
 
 pub fn nop(operands: Operands<'_>) -> Option<Ret> {
@@ -98,7 +106,7 @@ pub fn get_ld_operands<'a>(
     opcode: u8,
     value: Option<Ret>,
 ) -> Operands<'a> {
-    let hi = opcode & 0xF0 >> 4;
+    let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 
     let reg_copy = registers.clone();
@@ -136,7 +144,7 @@ pub fn get_ld_operands<'a>(
                     Word::U8Mut(&mut registers.a)
                 }
             }
-            _ => panic!("Not implemented!"),
+            _ => panic!("Opcode {opcode:#04x} not implemented! No match found for hi nibble"),
         };
 
         match lo {
@@ -156,7 +164,7 @@ pub fn get_ld_operands<'a>(
             0xD => Operands::Two(dest, Word::U8(reg_copy.l)),
             0xE => Operands::Two(dest, Word::U8(mem_hl_val)),
             0xF => Operands::Two(dest, Word::U8(reg_copy.a)),
-            _ => panic!("Not implemented"),
+            _ => panic!("Not implemented! No match found for lo nibble"),
         }
     } else {
         match lo {
@@ -324,5 +332,78 @@ mod instruction_tests {
 
         instruction.exec(Operands::Two(Word::U16Mut(&mut target), Word::U16(source)));
         assert_eq!(target, source)
+    }
+}
+
+#[cfg(test)]
+mod instruction_integration_tests {
+    use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+
+    use super::execute_instruction;
+
+    #[test]
+    fn test_execute_ld_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD B, C
+        memory.write_u8(0x0, 0x41);
+        registers.b = 18;
+        registers.c = 60;
+
+        execute_instruction(&mut registers, &mut memory);
+
+        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.b, 60);
+        assert_eq!(registers.c, 60);
+    }
+    #[test]
+    fn test_execute_ld_rx_hl_mem_instruction() {
+        let desired_result = 69;
+        let target_address = 0x0101;
+
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD [HL], B
+        let instruction = 0x70;
+        memory.write_u8(0x0, instruction);
+        registers.b = desired_result;
+        registers.set_hl(target_address);
+        memory.write_u8(target_address, 0);
+
+        execute_instruction(&mut registers, &mut memory);
+
+        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.b, desired_result);
+        assert_eq!(registers.get_hl(), target_address);
+        assert_eq!(memory.read_u8(target_address), desired_result);
+    }
+    #[test]
+    fn test_execute_ld_a16_mem_rx_instruction() {
+        let desired_result: u8 = 69;
+
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD [a16], A
+        let instruction = 0xEA;
+        memory.write_u8(0x0, instruction);
+
+        let address: u16 = 0x0101;
+        memory.write_u16(0x01, address);
+
+        registers.a = desired_result;
+
+        execute_instruction(&mut registers, &mut memory);
+
+        assert_eq!(registers.pc, 4);
+        assert_eq!(memory.read_u8(address), desired_result);
     }
 }

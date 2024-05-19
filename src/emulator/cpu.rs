@@ -1,8 +1,5 @@
 pub mod cpu_registers;
 
-use num_traits::{AsPrimitive, NumAssignRef};
-use std::default;
-
 use self::cpu_registers::CPURegisters;
 use super::{
     instructions::{self, Instruction, Operands, Ret, Word},
