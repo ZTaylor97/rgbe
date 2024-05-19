@@ -1,6 +1,7 @@
-use num_traits::NumAssignRef;
+use std::{fmt::Display, fs};
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use serde::{Deserialize, Serialize};
 
 pub enum Operands<'a> {
     None,
@@ -15,24 +16,46 @@ pub enum Word<'a> {
     U16Mut(&'a mut u16),
 }
 
+#[derive(Debug)]
 pub enum Ret {
     U8(u8),
     U16(u16),
 }
 
-pub struct Instruction {
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+pub struct InstructionData {
     pub mnemonic: String,
     pub bytes: u8,
-    pub cycles: u8,
+    pub cycles: Vec<u8>,
+    pub immediate: bool,
+    pub flags: InstructionDataFlags,
+}
+
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct InstructionDataOperands {
+    pub name: String,
+    pub immediate: bool,
+    pub bytes: Option<u8>,
+}
+
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+pub struct InstructionDataFlags {
+    pub Z: String,
+    pub N: String,
+    pub H: String,
+    pub C: String,
+}
+
+#[derive(Clone)]
+pub struct Instruction {
+    pub data: InstructionData,
     func: fn(Operands) -> Option<Ret>,
 }
 
 impl Default for Instruction {
     fn default() -> Self {
         Self {
-            mnemonic: String::default(),
-            bytes: 0,
-            cycles: 0,
+            data: InstructionData::default(),
             func: nop,
         }
     }
@@ -44,14 +67,14 @@ impl Instruction {
     }
 }
 
-pub fn execute_instruction(registers: &mut CPURegisters, memory: &mut Memory) {
+pub fn execute_instruction(
+    instruction: &Instruction,
+    registers: &mut CPURegisters,
+    memory: &mut Memory,
+) -> u8 {
     let opcode = memory.read_u8(registers.pc);
 
-    let instruction = fetch_instruction(opcode);
-
-    let opcode = memory.read_u8(registers.pc);
-
-    let value = match instruction.bytes {
+    let value = match instruction.data.bytes {
         1 => None,
         2 => Some(Ret::U8(memory.read_u8(registers.pc + 1))),
         3 => Some(Ret::U16(memory.read_u16(registers.pc + 1))),
@@ -62,26 +85,27 @@ pub fn execute_instruction(registers: &mut CPURegisters, memory: &mut Memory) {
 
     instruction.exec(operands);
 
-    registers.pc += (instruction.bytes + 1) as u16;
+    registers.pc += (instruction.data.bytes + 1) as u16;
 
-    // TODO: todo!("Implement instruction fetching")
+    instruction.data.cycles[0]
 }
 
-fn fetch_instruction(opcode: u8) -> Instruction {
-    match opcode {
-        0xEA..=0xFA => Instruction {
-            mnemonic: String::from("LD"),
-            bytes: 3,
-            cycles: 4,
-            func: ld,
-        },
-        _ => Instruction {
-            mnemonic: String::from("LD"),
-            bytes: 1,
-            cycles: 4,
-            func: ld,
-        },
-    }
+pub fn fetch_instructions() -> Vec<Instruction> {
+    let json_string = fs::read_to_string("instructions.json").expect("File not found");
+
+    let json: serde_json::Value = serde_json::from_str(json_string.as_str()).expect("Invalid JSON");
+
+    let array = json.get("instructions").unwrap().to_string();
+
+    let instructions_data: Vec<InstructionData> = serde_json::from_str(array.as_str()).unwrap();
+
+    instructions_data
+        .into_iter()
+        .map(|instruction_data| Instruction {
+            data: instruction_data,
+            func: ld, //TODO: mapping function to get appropriate callback
+        })
+        .collect()
 }
 
 pub fn nop(operands: Operands<'_>) -> Option<Ret> {
@@ -177,7 +201,7 @@ pub fn get_ld_operands<'a>(
                 let value = if let Some(Ret::U8(x)) = value {
                     x
                 } else {
-                    panic!("Numeric Value not passed");
+                    panic!("Numeric Value not passed for opcode: {opcode}");
                 };
 
                 match hi {
@@ -304,7 +328,7 @@ pub fn get_ld_operands<'a>(
 #[cfg(test)]
 mod instruction_tests {
 
-    use crate::emulator::instructions::{Instruction, Operands, Word};
+    use crate::emulator::instructions::{Instruction, InstructionData, Operands, Word};
 
     #[test]
     fn test_ld_r8_r8() {
@@ -312,9 +336,7 @@ mod instruction_tests {
         let mut target = 0;
 
         let instruction = Instruction {
-            mnemonic: Default::default(),
-            bytes: 0,
-            cycles: 4,
+            data: InstructionData::default(),
             func: super::ld,
         };
 
@@ -329,9 +351,7 @@ mod instruction_tests {
         let mut target = 0;
 
         let instruction = Instruction {
-            mnemonic: Default::default(),
-            bytes: 0,
-            cycles: 4,
+            data: InstructionData::default(),
             func: super::ld,
         };
 
@@ -344,44 +364,55 @@ mod instruction_tests {
 mod instruction_integration_tests {
     use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
 
-    use super::execute_instruction;
+    use super::{execute_instruction, fetch_instructions, Instruction};
 
     #[test]
     fn test_execute_ld_rx_rx_instruction() {
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
 
         assert_eq!(registers.pc, 0);
 
         // First instruction should be: LD B, C
-        memory.write_u8(0x0, 0x41);
+        let instruction = 0x41;
+        memory.write_u8(0x0, instruction);
         registers.b = 18;
         registers.c = 60;
 
-        execute_instruction(&mut registers, &mut memory);
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
 
         assert_eq!(registers.pc, 2);
         assert_eq!(registers.b, 60);
         assert_eq!(registers.c, 60);
     }
     #[test]
-    fn test_execute_ld_rx_hl_mem_instruction() {
+    fn test_execute_ld_rx_hlmem_instruction() {
         let desired_result = 69;
         let target_address = 0x0101;
 
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
 
         assert_eq!(registers.pc, 0);
 
         // First instruction should be: LD [HL], B
         let instruction = 0x70;
-        memory.write_u8(0x0, instruction);
         registers.b = desired_result;
         registers.set_hl(target_address);
+        memory.write_u8(0x0, instruction);
         memory.write_u8(target_address, 0);
 
-        execute_instruction(&mut registers, &mut memory);
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
 
         assert_eq!(registers.pc, 2);
         assert_eq!(registers.b, desired_result);
@@ -394,19 +425,23 @@ mod instruction_integration_tests {
 
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
 
         assert_eq!(registers.pc, 0);
 
         // First instruction should be: LD [a16], A
         let instruction = 0xEA;
-        memory.write_u8(0x0, instruction);
-
         let address: u16 = 0x0101;
+        memory.write_u8(0x0, instruction);
         memory.write_u16(0x01, address);
 
         registers.a = desired_result;
 
-        execute_instruction(&mut registers, &mut memory);
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
 
         assert_eq!(registers.pc, 4);
         assert_eq!(memory.read_u8(address), desired_result);
@@ -417,20 +452,24 @@ mod instruction_integration_tests {
 
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
 
         assert_eq!(registers.pc, 0);
 
         // First instruction should be: LD A, [a16]
         let instruction = 0xFA;
-        memory.write_u8(0x0, instruction);
-
         let address: u16 = 0x0101;
+        memory.write_u8(0x0, instruction);
         memory.write_u16(0x01, address);
         memory.write_u8(address, desired_result);
 
         registers.a = 0;
 
-        execute_instruction(&mut registers, &mut memory);
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
 
         assert_eq!(registers.pc, 4);
         assert_eq!(registers.a, desired_result);
