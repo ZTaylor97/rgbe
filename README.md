@@ -6,8 +6,7 @@ This is a **R**ust **G**ame**B**oy **E**mulator that I'm writing in my spare tim
 
 ## Tasks
 - [x] Project created
-- [ ] Set up a minimal gameboy memory representation
-  - [ ] 
+- [x] Set up a minimal gameboy memory representation 
 - [ ] Read in ROMs
 - [ ] Set up execution loop
-- [ ] Implement 1 instruction  
+- [x] Implement 1 instruction  
