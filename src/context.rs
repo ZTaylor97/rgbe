@@ -19,7 +19,6 @@ pub enum UpdateEvent {
     Continue,
     Stop,
 }
-
 impl SDLContext {
     pub fn new() -> Self {
         let context = sdl2::init().unwrap();
@@ -43,7 +42,7 @@ impl SDLContext {
             event_pump,
         }
     }
-
+// TODO:
     pub fn update(&mut self) -> UpdateEvent {
         for event in self.event_pump.poll_iter() {
             match event {
