@@ -4,7 +4,7 @@ use std::fs;
 
 use self::cpu_registers::CPURegisters;
 use super::{
-    instructions::{self, Instruction, InstructionData, Operands, Ret, Word},
+    instructions::{self, Instruction},
     memory::Memory,
 };
 
