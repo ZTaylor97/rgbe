@@ -1,6 +1,9 @@
+mod arithmetic;
 mod load;
 mod utils;
 use std::fs;
+
+use self::arithmetic::get_arithmetic_operands;
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use load::*;
@@ -41,9 +44,17 @@ pub fn execute_instruction(
         _ => panic!("Bytes is invalid"),
     };
 
-    let operands = get_ld_operands(registers, memory, opcode, value);
+    let operands = match instruction.data.mnemonic.as_str() {
+        "LD" => get_ld_operands(registers, memory, opcode, value),
+        "ADD" => get_arithmetic_operands(registers, memory, opcode, value),
+        _ => panic!("unimplemented"),
+    };
 
-    instruction.exec(operands);
+    let result = instruction.exec(operands);
+
+    if let Some(Ret::U8(x)) = result {
+        registers.f = x;
+    }
 
     registers.pc += (instruction.data.bytes + 1) as u16;
 
