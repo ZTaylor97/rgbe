@@ -32,10 +32,20 @@ pub fn add(operands: Operands<'_>) -> Option<Ret> {
     }
 }
 
+//TODO: Refactor add and adc functions
+
 pub fn adc(operands: Operands<'_>) -> Option<Ret> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
+                let mut flags: &mut u8 = flags.unwrap();
+
+                let source = if ((*flags & 0b00010000) >> 4) == 1 {
+                    source + 1
+                } else {
+                    source
+                };
+
                 let result: (u8, bool) = target.overflowing_add(source);
                 let carry = result.1 as u8;
                 *target = result.0;
@@ -49,9 +59,7 @@ pub fn adc(operands: Operands<'_>) -> Option<Ret> {
                 };
 
                 let negative = 0;
-                if let Some(flags) = flags {
-                    *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
-                }
+                *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
                 None
             }
             _ => panic!("Invalid operands"),
@@ -110,7 +118,7 @@ pub fn get_arithmetic_operands<'a>(
 #[cfg(test)]
 mod arithmetic_instruction_tests {
     use crate::emulator::instructions::*;
-    use arithmetic::add;
+    use arithmetic::{adc, add};
     use utils::Word;
 
     #[test]
@@ -167,6 +175,69 @@ mod arithmetic_instruction_tests {
         };
 
         let mut flags = 0;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+        assert_eq!(flags, 0b00010000);
+        assert_eq!(target, desired_result);
+    }
+    #[test]
+    fn test_adc_r8_r8() {
+        let source = 10;
+        let mut target = 5;
+        let desired_result = source + target + 1;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: adc,
+        };
+
+        let mut flags = 0b00010000;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+
+        assert_eq!(target, desired_result);
+    }
+    #[test]
+    fn test_adc_r8_r8_zero_flag() {
+        let source = 0;
+        let mut target = 0;
+        let desired_result = source + target + 1;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: adc,
+        };
+        let mut flags = 0b00010000;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+
+        assert_eq!(flags, 0b00000000); // zero flags should NOT be set because of carry
+        assert_eq!(target, desired_result);
+    }
+    #[test]
+    fn test_adc_r8_r8_carry_flag() {
+        let source: u8 = 200;
+        let mut target: u8 = 200;
+        let desired_result = source.wrapping_add(target + 1);
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: adc,
+        };
+
+        let mut flags = 0b00010000;
 
         instruction.exec(Operands::Two(
             Word::U8Mut(&mut target),
