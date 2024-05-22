@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 pub enum Operands<'a> {
     None,
-    One(Word<'a>),
-    Two(Word<'a>, Word<'a>),
+    One(Word<'a>, Option<&'a mut u8>),
+    Two(Word<'a>, Word<'a>, Option<&'a mut u8>),
 }
 
 pub enum Word<'a> {

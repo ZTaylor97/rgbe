@@ -3,7 +3,7 @@ use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use super::utils::{Operands, Ret, Word};
 
 pub fn ld(operands: Operands<'_>) -> Option<Ret> {
-    if let Operands::Two(target, source) = operands {
+    if let Operands::Two(target, source, _) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = source;
@@ -67,22 +67,22 @@ pub fn get_ld_operands<'a>(
         };
 
         match lo {
-            0x0 => Operands::Two(dest, Word::U8(reg_copy.b)),
-            0x1 => Operands::Two(dest, Word::U8(reg_copy.c)),
-            0x2 => Operands::Two(dest, Word::U8(reg_copy.d)),
-            0x3 => Operands::Two(dest, Word::U8(reg_copy.e)),
-            0x4 => Operands::Two(dest, Word::U8(reg_copy.h)),
-            0x5 => Operands::Two(dest, Word::U8(reg_copy.l)),
-            0x6 => Operands::Two(dest, Word::U8(mem_hl_val)),
-            0x7 => Operands::Two(dest, Word::U8(reg_copy.a)),
-            0x8 => Operands::Two(dest, Word::U8(reg_copy.b)),
-            0x9 => Operands::Two(dest, Word::U8(reg_copy.c)),
-            0xA => Operands::Two(dest, Word::U8(reg_copy.d)),
-            0xB => Operands::Two(dest, Word::U8(reg_copy.e)),
-            0xC => Operands::Two(dest, Word::U8(reg_copy.h)),
-            0xD => Operands::Two(dest, Word::U8(reg_copy.l)),
-            0xE => Operands::Two(dest, Word::U8(mem_hl_val)),
-            0xF => Operands::Two(dest, Word::U8(reg_copy.a)),
+            0x0 => Operands::Two(dest, Word::U8(reg_copy.b), None),
+            0x1 => Operands::Two(dest, Word::U8(reg_copy.c), None),
+            0x2 => Operands::Two(dest, Word::U8(reg_copy.d), None),
+            0x3 => Operands::Two(dest, Word::U8(reg_copy.e), None),
+            0x4 => Operands::Two(dest, Word::U8(reg_copy.h), None),
+            0x5 => Operands::Two(dest, Word::U8(reg_copy.l), None),
+            0x6 => Operands::Two(dest, Word::U8(mem_hl_val), None),
+            0x7 => Operands::Two(dest, Word::U8(reg_copy.a), None),
+            0x8 => Operands::Two(dest, Word::U8(reg_copy.b), None),
+            0x9 => Operands::Two(dest, Word::U8(reg_copy.c), None),
+            0xA => Operands::Two(dest, Word::U8(reg_copy.d), None),
+            0xB => Operands::Two(dest, Word::U8(reg_copy.e), None),
+            0xC => Operands::Two(dest, Word::U8(reg_copy.h), None),
+            0xD => Operands::Two(dest, Word::U8(reg_copy.l), None),
+            0xE => Operands::Two(dest, Word::U8(mem_hl_val), None),
+            0xF => Operands::Two(dest, Word::U8(reg_copy.a), None),
             _ => panic!("Not implemented! No match found for lo nibble"),
         }
     } else {
@@ -98,10 +98,12 @@ pub fn get_ld_operands<'a>(
                     0xE => Operands::Two(
                         Word::U8Mut(mem.read_u8_mut(value as u16)),
                         Word::U8(registers.a),
+                        None,
                     ),
                     0xF => Operands::Two(
                         Word::U8Mut(&mut registers.a),
                         Word::U8(mem.read_u8(value as u16)),
+                        None,
                     ),
                     _ => panic!("Not implemented!"),
                 }
@@ -113,30 +115,36 @@ pub fn get_ld_operands<'a>(
                     0x0 => Operands::Two(
                         Word::U8Mut(mem.read_u8_mut(registers.get_bc())),
                         Word::U8(source),
+                        None,
                     ),
                     0x1 => Operands::Two(
                         Word::U8Mut(mem.read_u8_mut(registers.get_de())),
                         Word::U8(source),
+                        None,
                     ),
                     0x2 => {
                         let hl = registers.get_hl();
-                        let ops = Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source));
+                        let ops =
+                            Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source), None);
                         registers.set_hl(hl + 1);
                         ops
                     }
                     0x3 => {
                         let hl = registers.get_hl();
-                        let ops = Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source));
+                        let ops =
+                            Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source), None);
                         registers.set_hl(hl - 1);
                         ops
                     }
                     0xE => Operands::Two(
                         Word::U8Mut(mem.read_u8_mut(registers.c as u16)),
                         Word::U8(source),
+                        None,
                     ),
                     0xF => Operands::Two(
                         Word::U8Mut(mem.read_u8_mut(source as u16)),
                         Word::U8(registers.c),
+                        None,
                     ),
                     _ => panic!("Not Implemented!"),
                 }
@@ -145,23 +153,31 @@ pub fn get_ld_operands<'a>(
                 0x0 => Operands::Two(
                     Word::U8Mut(&mut registers.a),
                     Word::U8(mem.read_u8(reg_copy.get_bc())),
+                    None,
                 ),
                 0x1 => Operands::Two(
                     Word::U8Mut(&mut registers.a),
                     Word::U8(mem.read_u8(reg_copy.get_de())),
+                    None,
                 ),
                 0x2 => {
                     let hl = reg_copy.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
+                    let ops = Operands::Two(
+                        Word::U8Mut(&mut registers.a),
+                        Word::U8(mem.read_u8(hl)),
+                        None,
+                    );
                     ops
                 }
                 0x3 => {
                     let hl = registers.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
+                    let ops = Operands::Two(
+                        Word::U8Mut(&mut registers.a),
+                        Word::U8(mem.read_u8(hl)),
+                        None,
+                    );
                     ops
                 }
                 0xE => {
@@ -171,7 +187,11 @@ pub fn get_ld_operands<'a>(
                         panic!("Numeric Value not passed");
                     };
 
-                    Operands::Two(Word::U8Mut(mem.read_u8_mut(value)), Word::U8(registers.a))
+                    Operands::Two(
+                        Word::U8Mut(mem.read_u8_mut(value)),
+                        Word::U8(registers.a),
+                        None,
+                    )
                 }
                 0xF => {
                     let value: u16 = if let Some(Ret::U16(x)) = value {
@@ -180,7 +200,11 @@ pub fn get_ld_operands<'a>(
                         panic!("Numeric Value not passed");
                     };
 
-                    Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(value)))
+                    Operands::Two(
+                        Word::U8Mut(&mut registers.a),
+                        Word::U8(mem.read_u8(value)),
+                        None,
+                    )
                 }
                 _ => panic!("Not Implemented!"),
             },
@@ -189,23 +213,31 @@ pub fn get_ld_operands<'a>(
                 0x0 => Operands::Two(
                     Word::U8Mut(&mut registers.c),
                     Word::U8(mem.read_u8(reg_copy.get_bc())),
+                    None,
                 ),
                 0x1 => Operands::Two(
                     Word::U8Mut(&mut registers.e),
                     Word::U8(mem.read_u8(reg_copy.get_de())),
+                    None,
                 ),
                 0x2 => {
                     let hl = reg_copy.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.l), Word::U8(mem.read_u8(hl)));
+                    let ops = Operands::Two(
+                        Word::U8Mut(&mut registers.l),
+                        Word::U8(mem.read_u8(hl)),
+                        None,
+                    );
                     ops
                 }
                 0x3 => {
                     let hl = registers.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
+                    let ops = Operands::Two(
+                        Word::U8Mut(&mut registers.a),
+                        Word::U8(mem.read_u8(hl)),
+                        None,
+                    );
                     ops
                 }
                 _ => panic!("Not Implemented!"),
@@ -230,7 +262,11 @@ mod load_instruction_tests {
             func: ld,
         };
 
-        instruction.exec(Operands::Two(Word::U8Mut(&mut target), Word::U8(source)));
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            None,
+        ));
 
         assert_eq!(target, source)
     }
@@ -245,7 +281,11 @@ mod load_instruction_tests {
             func: ld,
         };
 
-        instruction.exec(Operands::Two(Word::U16Mut(&mut target), Word::U16(source)));
+        instruction.exec(Operands::Two(
+            Word::U16Mut(&mut target),
+            Word::U16(source),
+            None,
+        ));
         assert_eq!(target, source)
     }
 }

@@ -3,7 +3,7 @@ use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use super::utils::{Operands, Ret, Word};
 
 pub fn add(operands: Operands<'_>) -> Option<Ret> {
-    if let Operands::Two(target, source) = operands {
+    if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 let result: (u8, bool) = target.overflowing_add(source);
@@ -19,10 +19,40 @@ pub fn add(operands: Operands<'_>) -> Option<Ret> {
                 };
 
                 let negative = 0;
+                if let Some(flags) = flags {
+                    *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
+                }
 
-                let ret: u8 = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
+                None
+            }
+            _ => panic!("Invalid operands"),
+        }
+    } else {
+        panic!("Incorrect number of operands")
+    }
+}
 
-                Some(Ret::U8(ret))
+pub fn adc(operands: Operands<'_>) -> Option<Ret> {
+    if let Operands::Two(target, source, flags) = operands {
+        match (target, source) {
+            (Word::U8Mut(target), Word::U8(source)) => {
+                let result: (u8, bool) = target.overflowing_add(source);
+                let carry = result.1 as u8;
+                *target = result.0;
+
+                let zero = if *target == 0 { 1 } else { 0 };
+
+                let half_carry = if ((*target & 0x0f) + (source & 0x0f)) > 0x0f {
+                    1
+                } else {
+                    0
+                };
+
+                let negative = 0;
+                if let Some(flags) = flags {
+                    *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
+                }
+                None
             }
             _ => panic!("Invalid operands"),
         }
@@ -45,9 +75,9 @@ pub fn get_arithmetic_operands<'a>(
     let hl = registers.get_hl();
     let mem_hl_val = mem.read_u8(hl).clone();
 
+    let dest = Word::U8Mut(&mut registers.a);
     // When in that nice block of load instructions
     if let 0x80..=0xBF = opcode {
-        let dest = Word::U8Mut(&mut registers.a);
         let source = match hi {
             0x0 | 0x8 => Word::U8(registers.b),
             0x1 | 0x9 => Word::U8(registers.c),
@@ -60,133 +90,19 @@ pub fn get_arithmetic_operands<'a>(
             _ => panic!("Opcode {opcode:#04x} not implemented! No match found for hi nibble"),
         };
 
-        Operands::Two(dest, source)
+        Operands::Two(dest, source, Some(&mut registers.f))
     } else {
         match lo {
-            0x0 => {
-                let value = if let Some(Ret::U8(x)) = value {
+            0x6 | 0xE => {
+                let value: u8 = if let Some(Ret::U8(x)) = value {
                     x
                 } else {
-                    panic!("Numeric Value not passed for opcode: {opcode}");
+                    panic!("A numeric value was expected for instruction: {opcode:#04x}");
                 };
 
-                match hi {
-                    0xE => Operands::Two(
-                        Word::U8Mut(mem.read_u8_mut(value as u16)),
-                        Word::U8(registers.a),
-                    ),
-                    0xF => Operands::Two(
-                        Word::U8Mut(&mut registers.a),
-                        Word::U8(mem.read_u8(value as u16)),
-                    ),
-                    _ => panic!("Not implemented!"),
-                }
+                Operands::Two(dest, Word::U8(value), Some(&mut registers.f))
             }
-            0x2 => {
-                let source = registers.a;
-
-                match hi {
-                    0x0 => Operands::Two(
-                        Word::U8Mut(mem.read_u8_mut(registers.get_bc())),
-                        Word::U8(source),
-                    ),
-                    0x1 => Operands::Two(
-                        Word::U8Mut(mem.read_u8_mut(registers.get_de())),
-                        Word::U8(source),
-                    ),
-                    0x2 => {
-                        let hl = registers.get_hl();
-                        let ops = Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source));
-                        registers.set_hl(hl + 1);
-                        ops
-                    }
-                    0x3 => {
-                        let hl = registers.get_hl();
-                        let ops = Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source));
-                        registers.set_hl(hl - 1);
-                        ops
-                    }
-                    0xE => Operands::Two(
-                        Word::U8Mut(mem.read_u8_mut(registers.c as u16)),
-                        Word::U8(source),
-                    ),
-                    0xF => Operands::Two(
-                        Word::U8Mut(mem.read_u8_mut(source as u16)),
-                        Word::U8(registers.c),
-                    ),
-                    _ => panic!("Not Implemented!"),
-                }
-            }
-            0xA => match hi {
-                0x0 => Operands::Two(
-                    Word::U8Mut(&mut registers.a),
-                    Word::U8(mem.read_u8(reg_copy.get_bc())),
-                ),
-                0x1 => Operands::Two(
-                    Word::U8Mut(&mut registers.a),
-                    Word::U8(mem.read_u8(reg_copy.get_de())),
-                ),
-                0x2 => {
-                    let hl = reg_copy.get_hl();
-                    registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
-                    ops
-                }
-                0x3 => {
-                    let hl = registers.get_hl();
-                    registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
-                    ops
-                }
-                0xE => {
-                    let value: u16 = if let Some(Ret::U16(x)) = value {
-                        x
-                    } else {
-                        panic!("Numeric Value not passed");
-                    };
-
-                    Operands::Two(Word::U8Mut(mem.read_u8_mut(value)), Word::U8(registers.a))
-                }
-                0xF => {
-                    let value: u16 = if let Some(Ret::U16(x)) = value {
-                        x
-                    } else {
-                        panic!("Numeric Value not passed");
-                    };
-
-                    Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(value)))
-                }
-                _ => panic!("Not Implemented!"),
-            },
-
-            0xE => match hi {
-                0x0 => Operands::Two(
-                    Word::U8Mut(&mut registers.c),
-                    Word::U8(mem.read_u8(reg_copy.get_bc())),
-                ),
-                0x1 => Operands::Two(
-                    Word::U8Mut(&mut registers.e),
-                    Word::U8(mem.read_u8(reg_copy.get_de())),
-                ),
-                0x2 => {
-                    let hl = reg_copy.get_hl();
-                    registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.l), Word::U8(mem.read_u8(hl)));
-                    ops
-                }
-                0x3 => {
-                    let hl = registers.get_hl();
-                    registers.set_hl(hl + 1);
-                    let ops =
-                        Operands::Two(Word::U8Mut(&mut registers.a), Word::U8(mem.read_u8(hl)));
-                    ops
-                }
-                _ => panic!("Not Implemented!"),
-            },
-            _ => panic!("Not implemented!"),
+            _ => panic!("instruction {opcode:#04x} not implemented!"),
         }
     }
 }
@@ -208,7 +124,13 @@ mod arithmetic_instruction_tests {
             func: add,
         };
 
-        instruction.exec(Operands::Two(Word::U8Mut(&mut target), Word::U8(source)));
+        let mut flags = 0;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
 
         assert_eq!(target, desired_result);
     }
@@ -222,12 +144,15 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: add,
         };
+        let mut flags = 0;
 
-        let result = instruction.exec(Operands::Two(Word::U8Mut(&mut target), Word::U8(source)));
-        if let Some(Ret::U8(x)) = result {
-            assert_eq!(x, 0b10000000)
-        }
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
 
+        assert_eq!(flags, 0b10000000);
         assert_eq!(target, desired_result);
     }
     #[test]
@@ -241,11 +166,14 @@ mod arithmetic_instruction_tests {
             func: add,
         };
 
-        let result = instruction.exec(Operands::Two(Word::U8Mut(&mut target), Word::U8(source)));
-        if let Some(Ret::U8(x)) = result {
-            assert_eq!(x, 0b00010000)
-        }
+        let mut flags = 0;
 
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+        assert_eq!(flags, 0b00010000);
         assert_eq!(target, desired_result);
     }
 }
