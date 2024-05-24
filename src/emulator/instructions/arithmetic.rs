@@ -6,7 +6,8 @@ pub fn add(operands: Operands<'_>) -> Option<Ret> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
-                add_with_flags(target, source, flags.unwrap())
+                *target = add_with_flags(target.clone(), source, flags.unwrap());
+                None
             }
             _ => panic!("Invalid operands"),
         }
@@ -27,7 +28,9 @@ pub fn adc(operands: Operands<'_>) -> Option<Ret> {
                     source
                 };
 
-                add_with_flags(target, source, flags)
+                *target = add_with_flags(target.clone(), source, flags);
+
+                None
             }
             _ => panic!("Invalid operands"),
         }
@@ -39,7 +42,8 @@ pub fn sub(operands: Operands<'_>) -> Option<Ret> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
-                sub_with_flags(target, source, flags.unwrap())
+                *target = sub_with_flags(target.clone(), source, flags.unwrap());
+                None
             }
             _ => panic!("Invalid operands"),
         }
@@ -60,7 +64,25 @@ pub fn sbc(operands: Operands<'_>) -> Option<Ret> {
                     source
                 };
 
-                sub_with_flags(target, source, flags)
+                *target = sub_with_flags(target.clone(), source, flags);
+                None
+            }
+            _ => panic!("Invalid operands"),
+        }
+    } else {
+        panic!("Incorrect number of operands")
+    }
+}
+pub fn xor(operands: Operands<'_>) -> Option<Ret> {
+    if let Operands::Two(target, source, flags) = operands {
+        match (target, source) {
+            (Word::U8Mut(target), Word::U8(source)) => {
+                *target ^= source;
+
+                let zero: u8 = (*target == 0) as u8;
+
+                *flags.unwrap() = zero << 7;
+                None
             }
             _ => panic!("Invalid operands"),
         }
@@ -69,32 +91,78 @@ pub fn sbc(operands: Operands<'_>) -> Option<Ret> {
     }
 }
 
-fn sub_with_flags(target: &mut u8, source: u8, flags: &mut u8) -> Option<Ret> {
+pub fn and(operands: Operands<'_>) -> Option<Ret> {
+    if let Operands::Two(target, source, flags) = operands {
+        match (target, source) {
+            (Word::U8Mut(target), Word::U8(source)) => {
+                *target &= source;
+
+                let zero: u8 = (*target == 0) as u8;
+
+                *flags.unwrap() = zero << 7 | 1 << 5; // half carry always set
+                None
+            }
+            _ => panic!("Invalid operands"),
+        }
+    } else {
+        panic!("Incorrect number of operands")
+    }
+}
+pub fn or(operands: Operands<'_>) -> Option<Ret> {
+    if let Operands::Two(target, source, flags) = operands {
+        match (target, source) {
+            (Word::U8Mut(target), Word::U8(source)) => {
+                *target |= source;
+
+                let zero: u8 = (*target == 0) as u8;
+
+                *flags.unwrap() = zero << 7; // half carry always set
+                None
+            }
+            _ => panic!("Invalid operands"),
+        }
+    } else {
+        panic!("Incorrect number of operands")
+    }
+}
+
+pub fn cp(operands: Operands<'_>) -> Option<Ret> {
+    if let Operands::Two(target, source, flags) = operands {
+        match (target, source) {
+            (Word::U8Mut(target), Word::U8(source)) => {
+                sub_with_flags(target.clone(), source, flags.unwrap());
+                None
+            }
+            _ => panic!("Invalid operands"),
+        }
+    } else {
+        panic!("Incorrect number of operands")
+    }
+}
+fn sub_with_flags(target: u8, source: u8, flags: &mut u8) -> u8 {
     let result: (u8, bool) = target.overflowing_sub(source);
     let carry = result.1 as u8;
 
-    let half_carry = if (source & 0x0f) > (*target & 0x0f) {
+    let half_carry = if (source & 0x0f) > (target & 0x0f) {
         1
     } else {
         0
     };
 
-    *target = result.0;
-
-    let zero = if *target == 0 { 1 } else { 0 };
+    let zero = if result.0 == 0 { 1 } else { 0 };
 
     let negative = 1;
     *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
-    None
+
+    result.0
 }
-fn add_with_flags(target: &mut u8, source: u8, flags: &mut u8) -> Option<Ret> {
+fn add_with_flags(target: u8, source: u8, flags: &mut u8) -> u8 {
     let result: (u8, bool) = target.overflowing_add(source);
     let carry = result.1 as u8;
-    *target = result.0;
 
-    let zero = if *target == 0 { 1 } else { 0 };
+    let zero = if result.0 == 0 { 1 } else { 0 };
 
-    let half_carry = if ((*target & 0x0f) + (source & 0x0f)) > 0x0f {
+    let half_carry = if ((result.0 & 0x0f) + (source & 0x0f)) > 0x0f {
         1
     } else {
         0
@@ -102,7 +170,8 @@ fn add_with_flags(target: &mut u8, source: u8, flags: &mut u8) -> Option<Ret> {
 
     let negative = 0;
     *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
-    None
+
+    result.0
 }
 
 pub fn get_arithmetic_operands<'a>(
@@ -154,7 +223,7 @@ pub fn get_arithmetic_operands<'a>(
 #[cfg(test)]
 mod arithmetic_instruction_tests {
     use crate::emulator::instructions::*;
-    use arithmetic::{adc, add, sbc, sub};
+    use arithmetic::{adc, add, sbc, sub, xor};
     use utils::Word;
 
     #[test]
@@ -251,7 +320,7 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: adc,
         };
-        let mut flags = 0b00010000;
+        let mut flags = 0b0001_0000;
 
         instruction.exec(Operands::Two(
             Word::U8Mut(&mut target),
@@ -349,68 +418,90 @@ mod arithmetic_instruction_tests {
         assert_eq!(target, desired_result);
     }
 
-    // TODO:
-    // #[test]
-    // fn test_sbc_r8_r8() {
-    //     let source = 5;
-    //     let mut target = 10;
-    //     let desired_result = target + 1;
-    //
-    //     let instruction = Instruction {
-    //         data: InstructionData::default(),
-    //         func: sbc,
-    //     };
-    //
-    //     let mut flags = 0b00010000;
-    //
-    //     instruction.exec(Operands::Two(
-    //         Word::U8Mut(&mut target),
-    //         Word::U8(source),
-    //         Some(&mut flags),
-    //     ));
-    //
-    //     assert_eq!(target, desired_result);
-    // }
-    // #[test]
-    // fn test_sbc_r8_r8_zero_flag() {
-    //     let source = 0;
-    //     let mut target = 0;
-    //     let desired_result = source + target + 1;
-    //
-    //     let instruction = Instruction {
-    //         data: InstructionData::default(),
-    //         func: sbc,
-    //     };
-    //     let mut flags = 0b00010000;
-    //
-    //     instruction.exec(Operands::Two(
-    //         Word::U8Mut(&mut target),
-    //         Word::U8(source),
-    //         Some(&mut flags),
-    //     ));
-    //
-    //     assert_eq!(flags, 0b00000000); // zero flags should NOT be set because of carry
-    //     assert_eq!(target, desired_result);
-    // }
-    // #[test]
-    // fn test_sbc_r8_r8_carry_flag() {
-    //     let source: u8 = 200;
-    //     let mut target: u8 = 200;
-    //     let desired_result = source.wrapping_sub(target + 1);
-    //
-    //     let instruction = Instruction {
-    //         data: InstructionData::default(),
-    //         func: sbc,
-    //     };
-    //
-    //     let mut flags = 0b00010000;
-    //
-    //     instruction.exec(Operands::Two(
-    //         Word::U8Mut(&mut target),
-    //         Word::U8(source),
-    //         Some(&mut flags),
-    //     ));
-    //     assert_eq!(flags, 0b00010000);
-    //     assert_eq!(target, desired_result);
-    // }
+    #[test]
+    fn test_sbc_r8_r8() {
+        let source = 5;
+        let mut target = 10;
+        let desired_result = target - (source + 1);
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: sbc,
+        };
+
+        let mut flags = 0b00010000;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+
+        assert_eq!(flags, 0b0100_0000);
+        assert_eq!(target, desired_result);
+    }
+    #[test]
+    fn test_sbc_r8_r8_zero_flag() {
+        let source: u8 = 0;
+        let mut target: u8 = 1;
+        let desired_result: u8 = target - (source + 1);
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: sbc,
+        };
+        let mut flags = 0b00010000;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+
+        assert_eq!(flags, 0b1100_0000);
+        assert_eq!(target, desired_result);
+    }
+
+    #[test]
+    fn test_sbc_r8_r8_carry_flag() {
+        let source: u8 = 200;
+        let mut target: u8 = 100;
+        let desired_result = target.wrapping_sub(source + 1);
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: sbc,
+        };
+
+        let mut flags = 0b00010000;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+        assert_eq!(flags, 0b0111_0000); // both carry and half carry should be set
+        assert_eq!(target, desired_result);
+    }
+
+    #[test]
+    fn test_xor() {
+        let source: u8 = 0b1111_0000;
+        let mut target: u8 = 0b0000_1111;
+        let desired_result = 0b1111_1111;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: xor,
+        };
+
+        let mut flags = 0b00010000;
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            Some(&mut flags),
+        ));
+        assert_eq!(target, desired_result);
+    }
 }
