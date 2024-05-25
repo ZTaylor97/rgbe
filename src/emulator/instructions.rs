@@ -3,7 +3,7 @@ mod load;
 mod utils;
 use std::fs;
 
-use self::arithmetic::get_arithmetic_operands;
+use arithmetic::*;
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use load::*;
@@ -46,15 +46,13 @@ pub fn execute_instruction(
 
     let operands = match instruction.data.mnemonic.as_str() {
         "LD" => get_ld_operands(registers, memory, opcode, value),
-        "ADD" => get_arithmetic_operands(registers, memory, opcode, value),
+        "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
+            get_arithmetic_operands(registers, memory, opcode, value)
+        }
         _ => panic!("unimplemented"),
     };
 
-    let result = instruction.exec(operands);
-
-    if let Some(Ret::U8(x)) = result {
-        registers.f = x;
-    }
+    instruction.exec(operands);
 
     registers.pc += (instruction.data.bytes + 1) as u16;
 
@@ -76,6 +74,14 @@ pub fn fetch_instructions() -> Vec<Instruction> {
             let func = match data.mnemonic.as_str() {
                 "LD" => ld,
                 "NOP" => nop,
+                "ADD" => add,
+                "ADC" => adc,
+                "SUB" => sub,
+                "SBC" => sbc,
+                "XOR" => xor,
+                "AND" => and,
+                "OR" => or,
+                "CP" => cp,
                 _ => nop,
             };
 
@@ -200,6 +206,110 @@ mod instruction_integration_tests {
         );
 
         assert_eq!(registers.pc, 4);
+        assert_eq!(registers.a, desired_result);
+    }
+    #[test]
+    fn test_execute_add_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD A, [a16]
+        let instruction = 0x80;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 10;
+        registers.b = 20;
+
+        let desired_result: u8 = registers.a + registers.b;
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.a, desired_result);
+    }
+    #[test]
+    fn test_execute_adc_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD A, [a16]
+        let instruction = 0x88;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 10;
+        registers.b = 20;
+
+        let desired_result: u8 = registers.a + registers.b;
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.a, desired_result);
+    }
+    #[test]
+    fn test_execute_sub_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD A, [a16]
+        let instruction = 0x90;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 30;
+        registers.b = 20;
+
+        let desired_result: u8 = registers.a - registers.b;
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.a, desired_result);
+    }
+    #[test]
+    fn test_execute_sbc_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD A, [a16]
+        let instruction = 0x98;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 30;
+        registers.b = 20;
+
+        let desired_result: u8 = registers.a - registers.b;
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 2);
         assert_eq!(registers.a, desired_result);
     }
 }

@@ -191,7 +191,7 @@ pub fn get_arithmetic_operands<'a>(
     let dest = Word::U8Mut(&mut registers.a);
     // When in that nice block of load instructions
     if let 0x80..=0xBF = opcode {
-        let source = match hi {
+        let source = match lo {
             0x0 | 0x8 => Word::U8(registers.b),
             0x1 | 0x9 => Word::U8(registers.c),
             0x2 | 0xA => Word::U8(registers.d),
@@ -200,7 +200,7 @@ pub fn get_arithmetic_operands<'a>(
             0x5 | 0xD => Word::U8(registers.l),
             0x6 | 0xE => Word::U8(mem_hl_val),
             0x7 | 0xF => Word::U8(reg_copy.a),
-            _ => panic!("Opcode {opcode:#04x} not implemented! No match found for hi nibble"),
+            _ => panic!("Opcode {opcode:#04x} not implemented! No match found for lo nibble"),
         };
 
         Operands::Two(dest, source, Some(&mut registers.f))

@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug)]
 pub enum Operands<'a> {
     None,
     One(Word<'a>, Option<&'a mut u8>),
     Two(Word<'a>, Word<'a>, Option<&'a mut u8>),
 }
 
+#[derive(Debug)]
 pub enum Word<'a> {
     U8(u8),
     U8Mut(&'a mut u8),
