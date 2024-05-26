@@ -1,3 +1,6 @@
+use core::fmt;
+use std::error::Error;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -44,3 +47,38 @@ pub struct InstructionDataFlags {
     pub H: String,
     pub C: String,
 }
+
+#[derive(Debug)]
+pub enum InstructionError<'a> {
+    UnimplementedError(u8),
+    InvalidOperandsError(Operands<'a>),
+    IncorrectOperandsError(String),
+    InvalidLiteral(Ret),
+}
+
+impl<'a> fmt::Display for InstructionError<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let err_str = match self {
+            Self::UnimplementedError(opcode) => {
+                format!("Opcode {:#04x} not implemented", opcode)
+            }
+            Self::InvalidOperandsError(operands) => {
+                format!("Operands {:?} not implemented", operands)
+            }
+            Self::InvalidLiteral(ret) => {
+                format!(
+                    "Literal value {:?} retrieve from memory is an unexpected type",
+                    ret
+                )
+            }
+            Self::IncorrectOperandsError(msg) => {
+                format!("{}", msg)
+            }
+            _ => String::from("Unknown error encountered"),
+        };
+
+        write!(f, "{}", err_str)
+    }
+}
+
+impl<'a> Error for InstructionError<'a> {}
