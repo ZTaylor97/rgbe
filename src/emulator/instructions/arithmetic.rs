@@ -1,22 +1,27 @@
 use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
 
-use super::utils::{Operands, Ret, Word};
+use super::utils::{InstructionError, Operands, Ret, Word};
 
-pub fn add(operands: Operands<'_>) -> Option<Ret> {
+pub fn add(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = add_with_flags(target.clone(), source, flags.unwrap());
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function add",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
 
-pub fn adc(operands: Operands<'_>) -> Option<Ret> {
+pub fn adc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -30,29 +35,39 @@ pub fn adc(operands: Operands<'_>) -> Option<Ret> {
 
                 *target = add_with_flags(target.clone(), source, flags);
 
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to function adc",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn sub(operands: Operands<'_>) -> Option<Ret> {
+pub fn sub(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = sub_with_flags(target.clone(), source, flags.unwrap());
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function sub",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
 
-pub fn sbc(operands: Operands<'_>) -> Option<Ret> {
+pub fn sbc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -65,15 +80,20 @@ pub fn sbc(operands: Operands<'_>) -> Option<Ret> {
                 };
 
                 *target = sub_with_flags(target.clone(), source, flags);
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function sbc",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn xor(operands: Operands<'_>) -> Option<Ret> {
+pub fn xor(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -82,16 +102,21 @@ pub fn xor(operands: Operands<'_>) -> Option<Ret> {
                 let zero: u8 = (*target == 0) as u8;
 
                 *flags.unwrap() = zero << 7;
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function xor",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
 
-pub fn and(operands: Operands<'_>) -> Option<Ret> {
+pub fn and(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -100,15 +125,20 @@ pub fn and(operands: Operands<'_>) -> Option<Ret> {
                 let zero: u8 = (*target == 0) as u8;
 
                 *flags.unwrap() = zero << 7 | 1 << 5; // half carry always set
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function and",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn or(operands: Operands<'_>) -> Option<Ret> {
+pub fn or(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -117,26 +147,36 @@ pub fn or(operands: Operands<'_>) -> Option<Ret> {
                 let zero: u8 = (*target == 0) as u8;
 
                 *flags.unwrap() = zero << 7; // half carry always set
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function or",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
 
-pub fn cp(operands: Operands<'_>) -> Option<Ret> {
+pub fn cp(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 sub_with_flags(target.clone(), source, flags.unwrap());
-                None
+                Ok(None)
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function cp",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
 fn sub_with_flags(target: u8, source: u8, flags: &mut u8) -> u8 {
@@ -179,7 +219,7 @@ pub fn get_arithmetic_operands<'a>(
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Operands<'a> {
+) -> Result<Operands<'a>, InstructionError<'a>> {
     let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 
@@ -200,22 +240,22 @@ pub fn get_arithmetic_operands<'a>(
             0x5 | 0xD => Word::U8(registers.l),
             0x6 | 0xE => Word::U8(mem_hl_val),
             0x7 | 0xF => Word::U8(reg_copy.a),
-            _ => panic!("Opcode {opcode:#04x} not implemented! No match found for lo nibble"),
+            _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
 
-        Operands::Two(dest, source, Some(&mut registers.f))
+        Ok(Operands::Two(dest, source, Some(&mut registers.f)))
     } else {
         match lo {
             0x6 | 0xE => {
                 let value: u8 = if let Some(Ret::U8(x)) = value {
                     x
                 } else {
-                    panic!("A numeric value was expected for instruction: {opcode:#04x}");
+                    return Err(InstructionError::InvalidLiteral(value.unwrap()));
                 };
 
-                Operands::Two(dest, Word::U8(value), Some(&mut registers.f))
+                Ok(Operands::Two(dest, Word::U8(value), Some(&mut registers.f)))
             }
-            _ => panic!("instruction {opcode:#04x} not implemented!"),
+            _ => return Err(InstructionError::UnimplementedError(opcode)),
         }
     }
 }

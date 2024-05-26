@@ -1,9 +1,11 @@
 mod arithmetic;
 mod load;
 mod utils;
-use std::fs;
+use std::{error::Error, fs};
 
 use arithmetic::*;
+
+use self::utils::InstructionError;
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use load::*;
@@ -12,7 +14,7 @@ use utils::{InstructionData, Operands, Ret};
 #[derive(Clone)]
 pub struct Instruction {
     pub data: InstructionData,
-    func: fn(Operands) -> Option<Ret>,
+    func: fn(Operands) -> Result<Option<Ret>, InstructionError>,
 }
 
 impl Default for Instruction {
@@ -26,7 +28,10 @@ impl Default for Instruction {
 
 impl Instruction {
     fn exec(&self, params: Operands) -> Option<Ret> {
-        (self.func)(params)
+        match (self.func)(params) {
+            Ok(ret) => ret,
+            Err(e) => panic!("{}", e),
+        }
     }
 }
 
@@ -52,7 +57,10 @@ pub fn execute_instruction(
         _ => panic!("unimplemented"),
     };
 
-    instruction.exec(operands);
+    let instruction_result = match operands {
+        Ok(operands) => instruction.exec(operands),
+        Err(e) => panic!("{}", e),
+    };
 
     registers.pc += (instruction.data.bytes + 1) as u16;
 
@@ -90,8 +98,8 @@ pub fn fetch_instructions() -> Vec<Instruction> {
         .collect()
 }
 
-pub fn nop(operands: Operands<'_>) -> Option<Ret> {
-    None
+pub fn nop(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+    Ok(None)
 }
 
 #[cfg(test)]

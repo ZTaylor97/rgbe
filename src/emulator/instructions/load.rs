@@ -1,8 +1,8 @@
 use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
 
-use super::utils::{Operands, Ret, Word};
+use super::utils::{InstructionError, Operands, Ret, Word};
 
-pub fn ld(operands: Operands<'_>) -> Option<Ret> {
+pub fn ld(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::Two(target, source, _) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -11,12 +11,17 @@ pub fn ld(operands: Operands<'_>) -> Option<Ret> {
             (Word::U16Mut(target), Word::U16(source)) => {
                 *target = source;
             }
-            _ => panic!("Invalid operands"),
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to add function ld",
+                    word1, word2
+                )));
+            }
         }
     } else {
-        panic!("Incorrect number of operands")
+        return Err(InstructionError::InvalidOperandsError(operands));
     }
-    None
+    Ok(None)
 }
 
 pub fn get_ld_operands<'a>(
@@ -24,7 +29,7 @@ pub fn get_ld_operands<'a>(
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Operands<'a> {
+) -> Result<Operands<'a>, InstructionError<'a>> {
     let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 
@@ -63,10 +68,10 @@ pub fn get_ld_operands<'a>(
                     Word::U8Mut(&mut registers.a)
                 }
             }
-            _ => panic!("Opcode {opcode:#04x} not implemented! No match found for hi nibble"),
+            _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
 
-        match lo {
+        let ops = match lo {
             0x0 => Operands::Two(dest, Word::U8(reg_copy.b), None),
             0x1 => Operands::Two(dest, Word::U8(reg_copy.c), None),
             0x2 => Operands::Two(dest, Word::U8(reg_copy.d), None),
@@ -83,15 +88,16 @@ pub fn get_ld_operands<'a>(
             0xD => Operands::Two(dest, Word::U8(reg_copy.l), None),
             0xE => Operands::Two(dest, Word::U8(mem_hl_val), None),
             0xF => Operands::Two(dest, Word::U8(reg_copy.a), None),
-            _ => panic!("Not implemented! No match found for lo nibble"),
-        }
+            _ => return Err(InstructionError::UnimplementedError(opcode)),
+        };
+        Ok(ops)
     } else {
-        match lo {
+        let ops = match lo {
             0x0 => {
                 let value = if let Some(Ret::U8(x)) = value {
                     x
                 } else {
-                    panic!("Numeric Value not passed for opcode: {opcode}");
+                    return Err(InstructionError::InvalidLiteral(value.unwrap()));
                 };
 
                 match hi {
@@ -105,7 +111,7 @@ pub fn get_ld_operands<'a>(
                         Word::U8(mem.read_u8(value as u16)),
                         None,
                     ),
-                    _ => panic!("Not implemented!"),
+                    _ => return Err(InstructionError::UnimplementedError(opcode)),
                 }
             }
             0x2 => {
@@ -146,7 +152,7 @@ pub fn get_ld_operands<'a>(
                         Word::U8(registers.c),
                         None,
                     ),
-                    _ => panic!("Not Implemented!"),
+                    _ => return Err(InstructionError::UnimplementedError(opcode)),
                 }
             }
             0xA => match hi {
@@ -184,7 +190,7 @@ pub fn get_ld_operands<'a>(
                     let value: u16 = if let Some(Ret::U16(x)) = value {
                         x
                     } else {
-                        panic!("Numeric Value not passed");
+                        return Err(InstructionError::InvalidLiteral(value.unwrap()));
                     };
 
                     Operands::Two(
@@ -197,7 +203,7 @@ pub fn get_ld_operands<'a>(
                     let value: u16 = if let Some(Ret::U16(x)) = value {
                         x
                     } else {
-                        panic!("Numeric Value not passed");
+                        return Err(InstructionError::InvalidLiteral(value.unwrap()));
                     };
 
                     Operands::Two(
@@ -206,7 +212,7 @@ pub fn get_ld_operands<'a>(
                         None,
                     )
                 }
-                _ => panic!("Not Implemented!"),
+                _ => return Err(InstructionError::UnimplementedError(opcode)),
             },
 
             0xE => match hi {
@@ -240,10 +246,11 @@ pub fn get_ld_operands<'a>(
                     );
                     ops
                 }
-                _ => panic!("Not Implemented!"),
+                _ => return Err(InstructionError::UnimplementedError(opcode)),
             },
-            _ => panic!("Not implemented!"),
-        }
+            _ => return Err(InstructionError::UnimplementedError(opcode)),
+        };
+        Ok(ops)
     }
 }
 
