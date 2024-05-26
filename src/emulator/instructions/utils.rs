@@ -40,6 +40,7 @@ pub struct InstructionDataOperands {
     pub bytes: Option<u8>,
 }
 
+#[allow(non_snake_case)]
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct InstructionDataFlags {
     pub Z: String,

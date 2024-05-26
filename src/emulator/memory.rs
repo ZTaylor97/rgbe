@@ -1,5 +1,4 @@
-use std::ops::Index;
-
+#![allow(unused)]
 #[derive(Default)]
 pub struct Memory {
     rom_0: Buffer<0x4000>,      // 0x0000 - 0x3FFF
@@ -17,6 +16,10 @@ pub struct Memory {
 impl Memory {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn swap_rom(&mut self, rom_bank: Buffer<0x4000>) {
+        self.rom_0 = rom_bank
     }
 
     pub fn read_u8_mut(&mut self, address: u16) -> &mut u8 {

@@ -1,6 +1,7 @@
+#![allow(unused)]
 use std::{fs::File, io::Read};
 
-use super::memory::{Buffer, ReadBuffer};
+use super::memory::Buffer;
 
 // TODO: carts may need to keep track of swappable bank state
 #[derive(Default)]
