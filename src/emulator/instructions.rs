@@ -2,15 +2,13 @@
 mod arithmetic;
 mod load;
 mod utils;
+
 use std::fs;
 
-use arithmetic::*;
-
-use self::utils::InstructionError;
-
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use arithmetic::*;
 use load::*;
-use utils::{InstructionData, Operands, Ret};
+use utils::{InstructionData, InstructionError, Operands, Ret};
 
 #[derive(Clone)]
 pub struct Instruction {
@@ -52,7 +50,7 @@ pub fn execute_instruction(
 
     // TODO: debug
     println!(
-        "Executing instruction{:#04x}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
+        "Executing instruction - {:#04x}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
         opcode, instruction.data, registers.pc, registers.sp
     );
 
