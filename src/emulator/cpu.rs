@@ -1,7 +1,5 @@
 pub mod cpu_registers;
 
-use std::fs;
-
 use self::cpu_registers::CPURegisters;
 use super::{
     instructions::{self, Instruction},

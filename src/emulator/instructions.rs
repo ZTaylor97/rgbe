@@ -1,7 +1,8 @@
+#![allow(unused)]
 mod arithmetic;
 mod load;
 mod utils;
-use std::{error::Error, fs};
+use std::fs;
 
 use arithmetic::*;
 
@@ -42,22 +43,37 @@ pub fn execute_instruction(
 ) -> u8 {
     let opcode = memory.read_u8(registers.pc);
 
-    let value = match instruction.data.bytes {
+    let value: Option<Ret> = match instruction.data.bytes {
         1 => None,
         2 => Some(Ret::U8(memory.read_u8(registers.pc + 1))),
         3 => Some(Ret::U16(memory.read_u16(registers.pc + 1))),
         _ => panic!("Bytes is invalid"),
     };
 
-    let operands = match instruction.data.mnemonic.as_str() {
+    // TODO: debug
+    println!(
+        "Executing instruction{:#04x}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
+        opcode, instruction.data, registers.pc, registers.sp
+    );
+
+    let operands: Result<Operands, InstructionError> = match instruction.data.mnemonic.as_str() {
         "LD" => get_ld_operands(registers, memory, opcode, value),
         "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
             get_arithmetic_operands(registers, memory, opcode, value)
         }
-        _ => panic!("unimplemented"),
+        _ => panic!(
+            "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
+            InstructionError::UnimplementedError(opcode),
+            instruction.data,
+            registers.pc,
+            registers.sp
+        ),
     };
 
-    let instruction_result = match operands {
+    // TODO: debug
+    println!("\tOperands - {:?}", operands);
+
+    let instruction_result: Option<Ret> = match operands {
         Ok(operands) => instruction.exec(operands),
         Err(e) => panic!("{}", e),
     };

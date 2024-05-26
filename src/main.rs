@@ -18,6 +18,6 @@ pub fn main() {
             _ => {}
         }
         emulator.update();
-        context.render()
+        context.render();
     }
 }
