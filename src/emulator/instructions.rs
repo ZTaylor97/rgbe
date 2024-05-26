@@ -1,12 +1,16 @@
 #![allow(unused)]
 mod arithmetic;
+mod increment;
 mod load;
 mod utils;
 
 use std::fs;
 
+use crate::emulator::instructions::increment::get_ncrement_operands;
+
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use arithmetic::*;
+use increment::*;
 use load::*;
 use utils::{InstructionData, InstructionError, Operands, Ret};
 
@@ -59,6 +63,7 @@ pub fn execute_instruction(
         "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
             get_arithmetic_operands(registers, memory, opcode, value)
         }
+        "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
         _ => panic!(
             "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
             InstructionError::UnimplementedError(opcode),
@@ -76,7 +81,7 @@ pub fn execute_instruction(
         Err(e) => panic!("{}", e),
     };
 
-    registers.pc += (instruction.data.bytes + 1) as u16;
+    registers.pc += (instruction.data.bytes) as u16;
 
     instruction.data.cycles[0]
 }
@@ -104,6 +109,8 @@ pub fn fetch_instructions() -> Vec<Instruction> {
                 "AND" => and,
                 "OR" => or,
                 "CP" => cp,
+                "INC" => inc,
+                "DEC" => dec,
                 _ => nop,
             };
 
@@ -142,7 +149,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.pc, 1);
         assert_eq!(registers.b, 60);
         assert_eq!(registers.c, 60);
     }
@@ -170,7 +177,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.pc, 1);
         assert_eq!(registers.b, desired_result);
         assert_eq!(registers.get_hl(), target_address);
         assert_eq!(memory.read_u8(target_address), desired_result);
@@ -199,7 +206,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 4);
+        assert_eq!(registers.pc, 3);
         assert_eq!(memory.read_u8(address), desired_result);
     }
     #[test]
@@ -227,7 +234,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 4);
+        assert_eq!(registers.pc, 3);
         assert_eq!(registers.a, desired_result);
     }
     #[test]
@@ -253,7 +260,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.pc, 1);
         assert_eq!(registers.a, desired_result);
     }
     #[test]
@@ -279,7 +286,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.pc, 1);
         assert_eq!(registers.a, desired_result);
     }
     #[test]
@@ -305,7 +312,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.pc, 1);
         assert_eq!(registers.a, desired_result);
     }
     #[test]
@@ -331,7 +338,7 @@ mod instruction_integration_tests {
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 2);
+        assert_eq!(registers.pc, 1);
         assert_eq!(registers.a, desired_result);
     }
 }
