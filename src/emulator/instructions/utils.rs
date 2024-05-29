@@ -3,6 +3,8 @@ use std::error::Error;
 
 use serde::{Deserialize, Serialize};
 
+use crate::emulator::memory::U16Wrapper;
+
 #[derive(Debug)]
 pub enum Operands<'a> {
     None,
@@ -15,6 +17,7 @@ pub enum Word<'a> {
     U8(u8),
     U8Mut(&'a mut u8),
     U16(u16),
+    U16WrapperMut(U16Wrapper<'a>),
     U16Mut(&'a mut u16),
 }
 
