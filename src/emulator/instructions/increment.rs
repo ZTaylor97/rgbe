@@ -1,8 +1,7 @@
-use num_traits::{ops::overflowing::OverflowingSub, WrappingAdd};
-
-use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use num_traits::{ops::overflowing::OverflowingSub, WrappingAdd, WrappingSub};
 
 use super::utils::{InstructionError, Operands, Ret, Word};
+use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
 
 pub fn inc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::One(target, flags) = operands {
@@ -11,8 +10,14 @@ pub fn inc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
                 *target = ncrementu8_with_flags(*target, true, flags.unwrap());
                 Ok(None)
             }
+            Word::U16WrapperMut(target) => {
+                let mut val: u16 = target.into_u16();
+                val.wrapping_add(1);
+                target.from_u16(val);
+                Ok(None)
+            }
             Word::U16Mut(target) => {
-                *target += 1;
+                *target = target.wrapping_add(1);
                 Ok(None)
             }
             (word1) => {
@@ -33,8 +38,14 @@ pub fn dec(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
                 *target = ncrementu8_with_flags(*target, false, flags.unwrap());
                 Ok(None)
             }
+            Word::U16WrapperMut(target) => {
+                let mut val: u16 = target.into_u16();
+                val.wrapping_sub(1);
+                target.from_u16(val);
+                Ok(None)
+            }
             Word::U16Mut(target) => {
-                *target -= 1;
+                *target = target.wrapping_sub(1);
                 Ok(None)
             }
             (word1) => {
@@ -83,4 +94,30 @@ pub fn get_ncrement_operands<'a>(
     };
 
     Ok(Operands::One(dest, Some(&mut registers.f)))
+}
+#[cfg(test)]
+mod ncrement_instruction_tests {
+    use crate::emulator::{
+        cpu::cpu_registers::convert_u16_to_two_u8s, instructions::*, memory::U16Wrapper,
+    };
+    use utils::Word;
+
+    #[test]
+    fn test_ld_r8_r8() {
+        let source = 10;
+        let mut target = 0;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: ld,
+        };
+
+        instruction.exec(Operands::Two(
+            Word::U8Mut(&mut target),
+            Word::U8(source),
+            None,
+        ));
+
+        assert_eq!(target, source)
+    }
 }

@@ -125,7 +125,10 @@ pub fn nop(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
 
 #[cfg(test)]
 mod instruction_integration_tests {
-    use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+    use crate::emulator::{
+        cpu::cpu_registers::{convert_u16_to_two_u8s, CPURegisters},
+        memory::Memory,
+    };
 
     use super::{execute_instruction, fetch_instructions, Instruction};
 
@@ -152,6 +155,33 @@ mod instruction_integration_tests {
         assert_eq!(registers.pc, 1);
         assert_eq!(registers.b, 60);
         assert_eq!(registers.c, 60);
+    }
+    #[test]
+    fn test_execute_ld_r16_n16_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        let desired_value = 6666;
+        let expected_values = convert_u16_to_two_u8s(desired_value);
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD B, C
+        let instruction = 0x01;
+        memory.write_u8(0x0, instruction);
+        memory.write_u16(0x1, desired_value);
+        registers.set_bc(desired_value);
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 3);
+        assert_eq!(registers.b, expected_values.0);
+        assert_eq!(registers.c, expected_values.1);
     }
     #[test]
     fn test_execute_ld_rx_hlmem_instruction() {

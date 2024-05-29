@@ -147,6 +147,20 @@ pub trait WriteBuffer {
     fn write_u8(&mut self, address: u16, value: u8);
 }
 
+#[derive(Debug)]
+pub struct U16Wrapper<'a>(pub &'a mut u8, pub &'a mut u8);
+
+impl<'a> U16Wrapper<'a> {
+    pub fn from_u16(self, value: u16) {
+        *self.0 = ((value & 0xFF00) >> 8) as u8;
+        *self.1 = (value & 0xFF) as u8;
+    }
+
+    pub fn into_u16(&self) -> u16 {
+        (*self.0 as u16) << 8 | *self.1 as u16
+    }
+}
+
 #[cfg(test)]
 mod memory_tests {
     use super::Memory;

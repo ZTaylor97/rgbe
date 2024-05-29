@@ -1,4 +1,9 @@
-use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use num_traits::WrappingAdd;
+
+use crate::emulator::{
+    cpu::cpu_registers::CPURegisters,
+    memory::{Memory, U16Wrapper},
+};
 
 use super::utils::{InstructionError, Operands, Ret, Word};
 
@@ -8,9 +13,8 @@ pub fn ld(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = source;
             }
-            (Word::U16Mut(target), Word::U16(source)) => {
-                *target = source;
-            }
+            (Word::U16WrapperMut(target), Word::U16(source)) => target.from_u16(source),
+            (Word::U16Mut(target), Word::U16(source)) => *target = source,
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
                     "Incorrect words {:?} , {:?} passed to add function ld",
@@ -114,6 +118,33 @@ pub fn get_ld_operands<'a>(
                     _ => return Err(InstructionError::UnimplementedError(opcode)),
                 }
             }
+            0x1 => {
+                let value = if let Some(Ret::U16(x)) = value {
+                    x
+                } else {
+                    return Err(InstructionError::InvalidLiteral(value.unwrap()));
+                };
+
+                match hi {
+                    0x0 => Operands::Two(
+                        Word::U16WrapperMut(U16Wrapper(&mut registers.b, &mut registers.c)),
+                        Word::U16(value),
+                        None,
+                    ),
+                    0x1 => Operands::Two(
+                        Word::U16WrapperMut(U16Wrapper(&mut registers.d, &mut registers.e)),
+                        Word::U16(value),
+                        None,
+                    ),
+                    0x2 => Operands::Two(
+                        Word::U16WrapperMut(U16Wrapper(&mut registers.h, &mut registers.l)),
+                        Word::U16(value),
+                        None,
+                    ),
+                    0x3 => Operands::Two(Word::U16Mut(&mut registers.sp), Word::U16(value), None),
+                    _ => return Err(InstructionError::UnimplementedError(opcode)),
+                }
+            }
             0x2 => {
                 let source = registers.a;
 
@@ -155,6 +186,39 @@ pub fn get_ld_operands<'a>(
                     _ => return Err(InstructionError::UnimplementedError(opcode)),
                 }
             }
+            0x8 => {
+                let mut u16_value: u16 = 0;
+                let mut u8_value: u8 = 0;
+
+                match value {
+                    Some(Ret::U16(x)) => {
+                        u16_value = x;
+                    }
+                    Some(Ret::U8(x)) => u8_value = x,
+                    _ => return Err(InstructionError::InvalidLiteral(value.unwrap())),
+                }
+
+                match hi {
+                    0x0 => Operands::Two(
+                        Word::U16WrapperMut(U16Wrapper(&mut registers.b, &mut registers.c)),
+                        Word::U16(u16_value),
+                        None,
+                    ),
+                    0xF => Operands::Two(
+                        Word::U16WrapperMut(U16Wrapper(&mut registers.h, &mut registers.l)),
+                        Word::U16(registers.sp.wrapping_add(u8_value as u16)),
+                        None,
+                    ),
+                    _ => return Err(InstructionError::UnimplementedError(opcode)),
+                }
+            }
+            0x9 => match hi {
+                0xF => {
+                    let hl = reg_copy.get_hl();
+                    Operands::Two(Word::U16Mut(&mut registers.sp), Word::U16(hl), None)
+                }
+                _ => return Err(InstructionError::UnimplementedError(opcode)),
+            },
             0xA => match hi {
                 0x0 => Operands::Two(
                     Word::U8Mut(&mut registers.a),
@@ -256,7 +320,9 @@ pub fn get_ld_operands<'a>(
 
 #[cfg(test)]
 mod load_instruction_tests {
-    use crate::emulator::instructions::*;
+    use crate::emulator::{
+        cpu::cpu_registers::convert_u16_to_two_u8s, instructions::*, memory::U16Wrapper,
+    };
     use utils::Word;
 
     #[test]
@@ -281,7 +347,7 @@ mod load_instruction_tests {
     #[test]
     fn test_ld_r16_r16() {
         let source = 30000;
-        let mut target = 0;
+        let mut target = (100, 200);
 
         let instruction = Instruction {
             data: InstructionData::default(),
@@ -289,10 +355,12 @@ mod load_instruction_tests {
         };
 
         instruction.exec(Operands::Two(
-            Word::U16Mut(&mut target),
+            Word::U16WrapperMut(U16Wrapper(&mut target.0, &mut target.1)),
             Word::U16(source),
             None,
         ));
-        assert_eq!(target, source)
+
+        let expected_values = convert_u16_to_two_u8s(source);
+        assert_eq!(target, expected_values)
     }
 }
