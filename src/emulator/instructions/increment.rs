@@ -1,7 +1,10 @@
 use num_traits::{ops::overflowing::OverflowingSub, WrappingAdd, WrappingSub};
 
 use super::utils::{InstructionError, Operands, Ret, Word};
-use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use crate::emulator::{
+    cpu::cpu_registers::CPURegisters,
+    memory::{Memory, U16Wrapper},
+};
 
 pub fn inc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     if let Operands::One(target, flags) = operands {
@@ -82,6 +85,10 @@ pub fn get_ncrement_operands<'a>(
     let hl = registers.get_hl();
 
     let dest = match opcode {
+        0x03 | 0x08 => Word::U16WrapperMut(U16Wrapper(&mut registers.b, &mut registers.c)),
+        0x13 | 0x18 => Word::U16WrapperMut(U16Wrapper(&mut registers.d, &mut registers.e)),
+        0x23 | 0x28 => Word::U16WrapperMut(U16Wrapper(&mut registers.h, &mut registers.l)),
+        0x33 | 0x38 => Word::U16Mut(&mut registers.sp),
         0x04 | 0x05 => Word::U8Mut(&mut registers.b),
         0x14 | 0x15 => Word::U8Mut(&mut registers.d),
         0x24 | 0x25 => Word::U8Mut(&mut registers.h),
@@ -103,21 +110,67 @@ mod ncrement_instruction_tests {
     use utils::Word;
 
     #[test]
-    fn test_ld_r8_r8() {
-        let source = 10;
+    fn test_inc_r8() {
         let mut target = 0;
+        let desired_value = target + 1;
 
         let instruction = Instruction {
             data: InstructionData::default(),
-            func: ld,
+            func: inc,
         };
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            None,
-        ));
+        let mut flags = 0;
 
-        assert_eq!(target, source)
+        instruction.exec(Operands::One(Word::U8Mut(&mut target), Some(&mut flags)));
+
+        assert_eq!(target, desired_value)
+    }
+    #[test]
+    fn test_dec_r8() {
+        let mut target = 1;
+        let desired_value = target - 1;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: dec,
+        };
+
+        let mut flags = 0;
+
+        instruction.exec(Operands::One(Word::U8Mut(&mut target), Some(&mut flags)));
+
+        assert_eq!(target, desired_value)
+    }
+    #[test]
+    fn test_inc_r16() {
+        let mut target = 1000;
+        let desired_value = target + 1;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: inc,
+        };
+
+        let mut flags = 0;
+
+        instruction.exec(Operands::One(Word::U16Mut(&mut target), Some(&mut flags)));
+
+        assert_eq!(target, desired_value)
+    }
+    #[test]
+    fn test_dec_r16() {
+        let mut target = 1000;
+        let desired_value = target - 1;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: dec,
+        };
+
+        let mut flags = 0;
+
+        instruction.exec(Operands::One(Word::U16Mut(&mut target), Some(&mut flags)));
+
+        assert_eq!(target, desired_value)
     }
 }
