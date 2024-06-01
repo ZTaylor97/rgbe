@@ -1,4 +1,7 @@
-use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use crate::emulator::{
+    cpu::cpu_registers::CPURegisters,
+    memory::{Memory, U16Wrapper},
+};
 
 use super::utils::{InstructionError, Operands, Ret, Word};
 
@@ -7,6 +10,16 @@ pub fn add(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = add_with_flags(target.clone(), source, flags.unwrap());
+                Ok(None)
+            }
+            (Word::U16WrapperMut(target), Word::U16(source)) => {
+                let mut val: u16 = target.into_u16();
+                val = add_u16_with_flags(val, source, flags.unwrap());
+                target.from_u16(val);
+                Ok(None)
+            }
+            (Word::U16Mut(target), Word::U16(source)) => {
+                *target = add_u16_with_flags(target.clone(), source, flags.unwrap());
                 Ok(None)
             }
             (word1, word2) => {
@@ -213,6 +226,23 @@ fn add_with_flags(target: u8, source: u8, flags: &mut u8) -> u8 {
 
     result.0
 }
+fn add_u16_with_flags(target: u16, source: u16, flags: &mut u8) -> u16 {
+    let result: (u16, bool) = target.overflowing_add(source);
+    let carry = result.1 as u8;
+
+    let zero = if result.0 == 0 { 1 } else { 0 };
+
+    let half_carry = if ((result.0 & 0x0f) + (source & 0x0f)) > 0x0f {
+        1
+    } else {
+        0
+    };
+
+    let negative = 0;
+    *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
+
+    result.0
+}
 
 pub fn get_arithmetic_operands<'a>(
     registers: &'a mut CPURegisters,
@@ -228,7 +258,6 @@ pub fn get_arithmetic_operands<'a>(
     let hl = registers.get_hl();
     let mem_hl_val = mem.read_u8(hl).clone();
 
-    let dest = Word::U8Mut(&mut registers.a);
     // When in that nice block of load instructions
     if let 0x80..=0xBF = opcode {
         let source = match lo {
@@ -243,7 +272,11 @@ pub fn get_arithmetic_operands<'a>(
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
 
-        Ok(Operands::Two(dest, source, Some(&mut registers.f)))
+        Ok(Operands::Two(
+            Word::U8Mut(&mut registers.a),
+            source,
+            Some(&mut registers.f),
+        ))
     } else {
         match lo {
             0x6 | 0xE => {
@@ -253,7 +286,39 @@ pub fn get_arithmetic_operands<'a>(
                     return Err(InstructionError::InvalidLiteral(value.unwrap()));
                 };
 
-                Ok(Operands::Two(dest, Word::U8(value), Some(&mut registers.f)))
+                Ok(Operands::Two(
+                    Word::U8Mut(&mut registers.a),
+                    Word::U8(value),
+                    Some(&mut registers.f),
+                ))
+            }
+            0x9 => {
+                let reg_copy = registers.clone();
+                let dest = Word::U16WrapperMut(U16Wrapper(&mut registers.h, &mut registers.l));
+
+                match hi {
+                    0x0 => Ok(Operands::Two(
+                        dest,
+                        Word::U16(reg_copy.get_bc()),
+                        Some(&mut registers.f),
+                    )),
+                    0x1 => Ok(Operands::Two(
+                        dest,
+                        Word::U16(reg_copy.get_de()),
+                        Some(&mut registers.f),
+                    )),
+                    0x2 => Ok(Operands::Two(
+                        dest,
+                        Word::U16(reg_copy.get_hl()),
+                        Some(&mut registers.f),
+                    )),
+                    0x3 => Ok(Operands::Two(
+                        dest,
+                        Word::U16(reg_copy.sp),
+                        Some(&mut registers.f),
+                    )),
+                    _ => return Err(InstructionError::UnimplementedError(opcode)),
+                }
             }
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         }
