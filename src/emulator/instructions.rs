@@ -1,6 +1,7 @@
 #![allow(unused)]
 mod arithmetic;
 mod increment;
+mod jump;
 mod load;
 mod utils;
 
@@ -12,12 +13,12 @@ use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use arithmetic::*;
 use increment::*;
 use load::*;
-use utils::{InstructionData, InstructionError, Operands, Ret};
+use utils::{BranchArgs, InstructionData, InstructionError, Operands, Ret};
 
 #[derive(Clone)]
 pub struct Instruction {
     pub data: InstructionData,
-    func: fn(Operands) -> Result<Option<Ret>, InstructionError>,
+    func: fn(Operands, BranchArgs) -> Result<u8, InstructionError>,
 }
 
 impl Default for Instruction {
@@ -30,8 +31,8 @@ impl Default for Instruction {
 }
 
 impl Instruction {
-    fn exec(&self, params: Operands) -> Option<Ret> {
-        match (self.func)(params) {
+    fn exec(&self, params: Operands, branch_args: BranchArgs) -> u8 {
+        match (self.func)(params, branch_args) {
             Ok(ret) => ret,
             Err(e) => panic!("{}", e),
         }
@@ -58,32 +59,39 @@ pub fn execute_instruction(
         opcode, instruction.data, registers.pc, registers.sp
     );
 
-    let operands: Result<Operands, InstructionError> = match instruction.data.mnemonic.as_str() {
-        "LD" => get_ld_operands(registers, memory, opcode, value),
-        "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
-            get_arithmetic_operands(registers, memory, opcode, value)
-        }
-        "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
-        _ => panic!(
-            "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
-            InstructionError::UnimplementedError(opcode),
-            instruction.data,
-            registers.pc,
-            registers.sp
-        ),
-    };
+    let get_operands_result: Result<(Operands, Option<u8>), InstructionError> =
+        match instruction.data.mnemonic.as_str() {
+            "LD" => get_ld_operands(registers, memory, opcode, value),
+            "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
+                get_arithmetic_operands(registers, memory, opcode, value)
+            }
+            "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
+            _ => panic!(
+                "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
+                InstructionError::UnimplementedError(opcode),
+                instruction.data,
+                registers.pc,
+                registers.sp
+            ),
+        };
 
     // TODO: debug
-    println!("\tOperands - {:?}", operands);
+    println!("\tOperands - {:?}", get_operands_result);
 
-    let instruction_result: Option<Ret> = match operands {
-        Ok(operands) => instruction.exec(operands),
+    let instruction_cycles: u8 = match get_operands_result {
+        Ok((operands, condition)) => instruction.exec(
+            operands,
+            BranchArgs {
+                cycles: instruction.data.cycles.clone(),
+                condition,
+            },
+        ),
         Err(e) => panic!("{}", e),
     };
 
     registers.pc += (instruction.data.bytes) as u16;
 
-    instruction.data.cycles[0]
+    instruction_cycles
 }
 
 pub fn fetch_instructions() -> Vec<Instruction> {
@@ -119,8 +127,8 @@ pub fn fetch_instructions() -> Vec<Instruction> {
         .collect()
 }
 
-pub fn nop(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
-    Ok(None)
+pub fn nop(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
+    Ok(branch_args.cycles[0])
 }
 
 #[cfg(test)]

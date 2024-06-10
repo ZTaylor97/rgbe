@@ -5,9 +5,9 @@ use crate::emulator::{
     memory::{Memory, U16Wrapper},
 };
 
-use super::utils::{InstructionError, Operands, Ret, Word};
+use super::utils::{BranchArgs, InstructionError, Operands, Ret, Word};
 
-pub fn ld(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn ld(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, _) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -25,7 +25,7 @@ pub fn ld(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     } else {
         return Err(InstructionError::InvalidOperandsError(operands));
     }
-    Ok(None)
+    Ok(branch_args.cycles[0])
 }
 
 pub fn get_ld_operands<'a>(
@@ -33,7 +33,7 @@ pub fn get_ld_operands<'a>(
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Result<Operands<'a>, InstructionError<'a>> {
+) -> Result<(Operands<'a>, Option<u8>), InstructionError<'a>> {
     let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 
@@ -94,7 +94,7 @@ pub fn get_ld_operands<'a>(
             0xF => Operands::Two(dest, Word::U8(reg_copy.a), None),
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
-        Ok(ops)
+        Ok((ops, None))
     } else {
         let ops = match lo {
             0x0 => {
@@ -314,7 +314,7 @@ pub fn get_ld_operands<'a>(
             },
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
-        Ok(ops)
+        Ok((ops, None))
     }
 }
 
@@ -334,12 +334,15 @@ mod load_instruction_tests {
             data: InstructionData::default(),
             func: ld,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            None,
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), None),
+            branch_args,
+        );
 
         assert_eq!(target, source)
     }
@@ -353,12 +356,19 @@ mod load_instruction_tests {
             data: InstructionData::default(),
             func: ld,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
-        instruction.exec(Operands::Two(
-            Word::U16WrapperMut(U16Wrapper(&mut target.0, &mut target.1)),
-            Word::U16(source),
-            None,
-        ));
+        instruction.exec(
+            Operands::Two(
+                Word::U16WrapperMut(U16Wrapper(&mut target.0, &mut target.1)),
+                Word::U16(source),
+                None,
+            ),
+            branch_args,
+        );
 
         let expected_values = convert_u16_to_two_u8s(source);
         assert_eq!(target, expected_values)

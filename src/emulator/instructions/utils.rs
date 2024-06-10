@@ -60,6 +60,12 @@ pub enum InstructionError<'a> {
     InvalidLiteral(Ret),
 }
 
+#[derive(Debug)]
+pub struct BranchArgs {
+    pub cycles: Vec<u8>,
+    pub condition: Option<u8>, // if flags matches this
+}
+
 impl<'a> fmt::Display for InstructionError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let err_str = match self {

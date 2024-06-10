@@ -1,27 +1,27 @@
 use num_traits::{ops::overflowing::OverflowingSub, WrappingAdd, WrappingSub};
 
-use super::utils::{InstructionError, Operands, Ret, Word};
+use super::utils::{BranchArgs, InstructionError, Operands, Ret, Word};
 use crate::emulator::{
     cpu::cpu_registers::CPURegisters,
     memory::{Memory, U16Wrapper},
 };
 
-pub fn inc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn inc(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::One(target, flags) = operands {
         match (target) {
             Word::U8Mut(target) => {
                 *target = ncrementu8_with_flags(*target, true, flags.unwrap());
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             Word::U16WrapperMut(target) => {
                 let mut val: u16 = target.into_u16();
                 val.wrapping_add(1);
                 target.from_u16(val);
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             Word::U16Mut(target) => {
                 *target = target.wrapping_add(1);
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -34,22 +34,22 @@ pub fn inc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
         return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn dec(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn dec(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::One(target, flags) = operands {
         match (target) {
             Word::U8Mut(target) => {
                 *target = ncrementu8_with_flags(*target, false, flags.unwrap());
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             Word::U16WrapperMut(target) => {
                 let mut val: u16 = target.into_u16();
                 val.wrapping_sub(1);
                 target.from_u16(val);
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             Word::U16Mut(target) => {
                 *target = target.wrapping_sub(1);
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -81,7 +81,7 @@ pub fn get_ncrement_operands<'a>(
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Result<Operands<'a>, InstructionError<'a>> {
+) -> Result<(Operands<'a>, Option<u8>), InstructionError<'a>> {
     let hl = registers.get_hl();
 
     let dest = match opcode {
@@ -100,7 +100,7 @@ pub fn get_ncrement_operands<'a>(
         _ => return Err(InstructionError::UnimplementedError(opcode)),
     };
 
-    Ok(Operands::One(dest, Some(&mut registers.f)))
+    Ok((Operands::One(dest, Some(&mut registers.f)), None))
 }
 #[cfg(test)]
 mod ncrement_instruction_tests {
@@ -119,9 +119,17 @@ mod ncrement_instruction_tests {
             func: inc,
         };
 
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
+
         let mut flags = 0;
 
-        instruction.exec(Operands::One(Word::U8Mut(&mut target), Some(&mut flags)));
+        instruction.exec(
+            Operands::One(Word::U8Mut(&mut target), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_value)
     }
@@ -135,9 +143,16 @@ mod ncrement_instruction_tests {
             func: dec,
         };
 
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
         let mut flags = 0;
 
-        instruction.exec(Operands::One(Word::U8Mut(&mut target), Some(&mut flags)));
+        instruction.exec(
+            Operands::One(Word::U8Mut(&mut target), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_value)
     }
@@ -150,10 +165,17 @@ mod ncrement_instruction_tests {
             data: InstructionData::default(),
             func: inc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0;
 
-        instruction.exec(Operands::One(Word::U16Mut(&mut target), Some(&mut flags)));
+        instruction.exec(
+            Operands::One(Word::U16Mut(&mut target), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_value)
     }
@@ -166,10 +188,17 @@ mod ncrement_instruction_tests {
             data: InstructionData::default(),
             func: dec,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0;
 
-        instruction.exec(Operands::One(Word::U16Mut(&mut target), Some(&mut flags)));
+        instruction.exec(
+            Operands::One(Word::U16Mut(&mut target), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_value)
     }
