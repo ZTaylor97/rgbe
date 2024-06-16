@@ -59,6 +59,7 @@ pub fn execute_instruction(
         "Executing instruction - {:#04x}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
         opcode, instruction.data, registers.pc, registers.sp
     );
+    registers.pc += (instruction.data.bytes) as u16;
 
     let get_operands_result: Result<Args, InstructionError> =
         match instruction.data.mnemonic.as_str() {
@@ -90,8 +91,6 @@ pub fn execute_instruction(
         ),
         Err(e) => panic!("{}", e),
     };
-
-    registers.pc += (instruction.data.bytes) as u16;
 
     instruction_cycles
 }
@@ -359,6 +358,32 @@ mod instruction_integration_tests {
     }
     #[test]
     fn test_execute_sbc_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD A, [a16]
+        let instruction = 0x98;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 30;
+        registers.b = 20;
+
+        let desired_result: u8 = registers.a - registers.b;
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 1);
+        assert_eq!(registers.a, desired_result);
+    }
+    #[test]
+    fn test_execute_jp_zc_instruction() {
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
         let instructions: Vec<Instruction> = fetch_instructions();
