@@ -1,23 +1,25 @@
 #![allow(unused)]
 mod arithmetic;
 mod increment;
+mod jump;
 mod load;
 mod utils;
 
 use std::fs;
 
-use crate::emulator::instructions::increment::get_ncrement_operands;
+use crate::emulator::instructions::jump::get_jump_operands;
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use arithmetic::*;
 use increment::*;
+use jump::*;
 use load::*;
-use utils::{InstructionData, InstructionError, Operands, Ret};
+use utils::{Args, BranchArgs, InstructionData, InstructionError, Operands, Ret};
 
 #[derive(Clone)]
 pub struct Instruction {
     pub data: InstructionData,
-    func: fn(Operands) -> Result<Option<Ret>, InstructionError>,
+    func: fn(Operands, BranchArgs) -> Result<u8, InstructionError>,
 }
 
 impl Default for Instruction {
@@ -30,8 +32,8 @@ impl Default for Instruction {
 }
 
 impl Instruction {
-    fn exec(&self, params: Operands) -> Option<Ret> {
-        match (self.func)(params) {
+    fn exec(&self, params: Operands, branch_args: BranchArgs) -> u8 {
+        match (self.func)(params, branch_args) {
             Ok(ret) => ret,
             Err(e) => panic!("{}", e),
         }
@@ -57,33 +59,40 @@ pub fn execute_instruction(
         "Executing instruction - {:#04x}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
         opcode, instruction.data, registers.pc, registers.sp
     );
+    registers.pc += (instruction.data.bytes) as u16;
 
-    let operands: Result<Operands, InstructionError> = match instruction.data.mnemonic.as_str() {
-        "LD" => get_ld_operands(registers, memory, opcode, value),
-        "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
-            get_arithmetic_operands(registers, memory, opcode, value)
-        }
-        "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
-        _ => panic!(
-            "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
-            InstructionError::UnimplementedError(opcode),
-            instruction.data,
-            registers.pc,
-            registers.sp
-        ),
-    };
+    let get_operands_result: Result<Args, InstructionError> =
+        match instruction.data.mnemonic.as_str() {
+            "LD" => get_ld_operands(registers, memory, opcode, value),
+            "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
+                get_arithmetic_operands(registers, memory, opcode, value)
+            }
+            "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
+            "JP" | "JR" => get_jump_operands(registers, memory, opcode, value),
+            _ => panic!(
+                "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
+                InstructionError::UnimplementedError(opcode),
+                instruction.data,
+                registers.pc,
+                registers.sp
+            ),
+        };
 
     // TODO: debug
-    println!("\tOperands - {:?}", operands);
+    println!("\tOperands - {:?}", get_operands_result);
 
-    let instruction_result: Option<Ret> = match operands {
-        Ok(operands) => instruction.exec(operands),
+    let instruction_cycles: u8 = match get_operands_result {
+        Ok((operands, condition)) => instruction.exec(
+            operands,
+            BranchArgs {
+                cycles: instruction.data.cycles.clone(),
+                condition,
+            },
+        ),
         Err(e) => panic!("{}", e),
     };
 
-    registers.pc += (instruction.data.bytes) as u16;
-
-    instruction.data.cycles[0]
+    instruction_cycles
 }
 
 pub fn fetch_instructions() -> Vec<Instruction> {
@@ -111,6 +120,8 @@ pub fn fetch_instructions() -> Vec<Instruction> {
                 "CP" => cp,
                 "INC" => inc,
                 "DEC" => dec,
+                "JP" => jp,
+                "JR" => jr,
                 _ => nop,
             };
 
@@ -119,8 +130,8 @@ pub fn fetch_instructions() -> Vec<Instruction> {
         .collect()
 }
 
-pub fn nop(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
-    Ok(None)
+pub fn nop(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
+    Ok(branch_args.cycles[0])
 }
 
 #[cfg(test)]
@@ -347,6 +358,32 @@ mod instruction_integration_tests {
     }
     #[test]
     fn test_execute_sbc_rx_rx_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: LD A, [a16]
+        let instruction = 0x98;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 30;
+        registers.b = 20;
+
+        let desired_result: u8 = registers.a - registers.b;
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 1);
+        assert_eq!(registers.a, desired_result);
+    }
+    #[test]
+    fn test_execute_jp_zc_instruction() {
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
         let instructions: Vec<Instruction> = fetch_instructions();

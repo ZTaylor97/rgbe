@@ -4,6 +4,7 @@ use std::error::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::emulator::memory::U16Wrapper;
+pub type Args<'a> = (Operands<'a>, Option<u8>);
 
 #[derive(Debug)]
 pub enum Operands<'a> {
@@ -58,6 +59,12 @@ pub enum InstructionError<'a> {
     InvalidOperandsError(Operands<'a>),
     IncorrectOperandsError(String),
     InvalidLiteral(Ret),
+}
+
+#[derive(Debug)]
+pub struct BranchArgs {
+    pub cycles: Vec<u8>,
+    pub condition: Option<u8>, // if flags matches this
 }
 
 impl<'a> fmt::Display for InstructionError<'a> {

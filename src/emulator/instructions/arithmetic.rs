@@ -1,13 +1,26 @@
-use crate::emulator::{cpu::cpu_registers::CPURegisters, memory::Memory};
+use crate::emulator::{
+    cpu::cpu_registers::CPURegisters,
+    memory::{Memory, U16Wrapper},
+};
 
-use super::utils::{InstructionError, Operands, Ret, Word};
+use super::utils::{Args, BranchArgs, InstructionError, Operands, Ret, Word};
 
-pub fn add(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn add(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = add_with_flags(target.clone(), source, flags.unwrap());
-                Ok(None)
+                Ok(branch_args.cycles[0])
+            }
+            (Word::U16WrapperMut(target), Word::U16(source)) => {
+                let mut val: u16 = target.into_u16();
+                val = add_u16_with_flags(val, source, flags.unwrap());
+                target.from_u16(val);
+                Ok(branch_args.cycles[0])
+            }
+            (Word::U16Mut(target), Word::U16(source)) => {
+                *target = add_u16_with_flags(target.clone(), source, flags.unwrap());
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -21,7 +34,7 @@ pub fn add(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     }
 }
 
-pub fn adc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn adc(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -35,7 +48,7 @@ pub fn adc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
 
                 *target = add_with_flags(target.clone(), source, flags);
 
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -48,12 +61,12 @@ pub fn adc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
         return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn sub(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn sub(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 *target = sub_with_flags(target.clone(), source, flags.unwrap());
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -67,7 +80,7 @@ pub fn sub(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     }
 }
 
-pub fn sbc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn sbc(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -80,7 +93,7 @@ pub fn sbc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
                 };
 
                 *target = sub_with_flags(target.clone(), source, flags);
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -93,7 +106,7 @@ pub fn sbc(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
         return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn xor(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn xor(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -102,7 +115,7 @@ pub fn xor(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
                 let zero: u8 = (*target == 0) as u8;
 
                 *flags.unwrap() = zero << 7;
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -116,7 +129,7 @@ pub fn xor(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     }
 }
 
-pub fn and(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn and(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -125,7 +138,7 @@ pub fn and(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
                 let zero: u8 = (*target == 0) as u8;
 
                 *flags.unwrap() = zero << 7 | 1 << 5; // half carry always set
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -138,7 +151,7 @@ pub fn and(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
         return Err(InstructionError::InvalidOperandsError(operands));
     }
 }
-pub fn or(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn or(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
@@ -147,7 +160,7 @@ pub fn or(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
                 let zero: u8 = (*target == 0) as u8;
 
                 *flags.unwrap() = zero << 7; // half carry always set
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -161,12 +174,12 @@ pub fn or(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
     }
 }
 
-pub fn cp(operands: Operands<'_>) -> Result<Option<Ret>, InstructionError> {
+pub fn cp(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
         match (target, source) {
             (Word::U8Mut(target), Word::U8(source)) => {
                 sub_with_flags(target.clone(), source, flags.unwrap());
-                Ok(None)
+                Ok(branch_args.cycles[0])
             }
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
@@ -213,13 +226,30 @@ fn add_with_flags(target: u8, source: u8, flags: &mut u8) -> u8 {
 
     result.0
 }
+fn add_u16_with_flags(target: u16, source: u16, flags: &mut u8) -> u16 {
+    let result: (u16, bool) = target.overflowing_add(source);
+    let carry = result.1 as u8;
+
+    let zero = if result.0 == 0 { 1 } else { 0 };
+
+    let half_carry = if ((result.0 & 0x0f) + (source & 0x0f)) > 0x0f {
+        1
+    } else {
+        0
+    };
+
+    let negative = 0;
+    *flags = (zero << 7) | (negative << 6) | (half_carry << 5) | (carry << 4);
+
+    result.0
+}
 
 pub fn get_arithmetic_operands<'a>(
     registers: &'a mut CPURegisters,
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Result<Operands<'a>, InstructionError<'a>> {
+) -> Result<Args<'a>, InstructionError<'a>> {
     let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 
@@ -228,9 +258,8 @@ pub fn get_arithmetic_operands<'a>(
     let hl = registers.get_hl();
     let mem_hl_val = mem.read_u8(hl).clone();
 
-    let dest = Word::U8Mut(&mut registers.a);
     // When in that nice block of load instructions
-    if let 0x80..=0xBF = opcode {
+    let ops = if let 0x80..=0xBF = opcode {
         let source = match lo {
             0x0 | 0x8 => Word::U8(registers.b),
             0x1 | 0x9 => Word::U8(registers.c),
@@ -243,7 +272,11 @@ pub fn get_arithmetic_operands<'a>(
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
 
-        Ok(Operands::Two(dest, source, Some(&mut registers.f)))
+        Operands::Two(
+            Word::U8Mut(&mut registers.a),
+            source,
+            Some(&mut registers.f),
+        )
     } else {
         match lo {
             0x6 | 0xE => {
@@ -253,11 +286,35 @@ pub fn get_arithmetic_operands<'a>(
                     return Err(InstructionError::InvalidLiteral(value.unwrap()));
                 };
 
-                Ok(Operands::Two(dest, Word::U8(value), Some(&mut registers.f)))
+                Operands::Two(
+                    Word::U8Mut(&mut registers.a),
+                    Word::U8(value),
+                    Some(&mut registers.f),
+                )
+            }
+            0x9 => {
+                let reg_copy = registers.clone();
+                let dest = Word::U16WrapperMut(U16Wrapper(&mut registers.h, &mut registers.l));
+
+                match hi {
+                    0x0 => {
+                        Operands::Two(dest, Word::U16(reg_copy.get_bc()), Some(&mut registers.f))
+                    }
+                    0x1 => {
+                        Operands::Two(dest, Word::U16(reg_copy.get_de()), Some(&mut registers.f))
+                    }
+                    0x2 => {
+                        Operands::Two(dest, Word::U16(reg_copy.get_hl()), Some(&mut registers.f))
+                    }
+                    0x3 => Operands::Two(dest, Word::U16(reg_copy.sp), Some(&mut registers.f)),
+                    _ => return Err(InstructionError::UnimplementedError(opcode)),
+                }
             }
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         }
-    }
+    };
+
+    Ok((ops, None))
 }
 
 #[cfg(test)]
@@ -276,14 +333,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: add,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_result);
     }
@@ -297,13 +357,16 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: add,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
         let mut flags = 0;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(flags, 0b10000000);
         assert_eq!(target, desired_result);
@@ -318,14 +381,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: add,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
         assert_eq!(flags, 0b00010000);
         assert_eq!(target, desired_result);
     }
@@ -339,14 +405,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: adc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0b00010000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_result);
     }
@@ -360,13 +429,16 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: adc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
         let mut flags = 0b0001_0000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(flags, 0b00000000); // zero flags should NOT be set because of carry
         assert_eq!(target, desired_result);
@@ -381,14 +453,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: adc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0b00010000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
         assert_eq!(flags, 0b00010000);
         assert_eq!(target, desired_result);
     }
@@ -403,14 +478,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: sub,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0b00000000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(target, desired_result);
         assert_eq!(flags, 0b01000000);
@@ -425,13 +503,16 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: sub,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
         let mut flags = 0;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(flags, 0b11000000);
         assert_eq!(target, desired_result);
@@ -446,14 +527,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: sub,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
         assert_eq!(flags, 0b0111_0000);
         assert_eq!(target, desired_result);
     }
@@ -468,14 +552,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: sbc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0b00010000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(flags, 0b0100_0000);
         assert_eq!(target, desired_result);
@@ -490,13 +577,16 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: sbc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
         let mut flags = 0b00010000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
 
         assert_eq!(flags, 0b1100_0000);
         assert_eq!(target, desired_result);
@@ -512,14 +602,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: sbc,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0b00010000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
         assert_eq!(flags, 0b0111_0000); // both carry and half carry should be set
         assert_eq!(target, desired_result);
     }
@@ -534,14 +627,17 @@ mod arithmetic_instruction_tests {
             data: InstructionData::default(),
             func: xor,
         };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
 
         let mut flags = 0b00010000;
 
-        instruction.exec(Operands::Two(
-            Word::U8Mut(&mut target),
-            Word::U8(source),
-            Some(&mut flags),
-        ));
+        instruction.exec(
+            Operands::Two(Word::U8Mut(&mut target), Word::U8(source), Some(&mut flags)),
+            branch_args,
+        );
         assert_eq!(target, desired_result);
     }
 }
