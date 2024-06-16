@@ -4,6 +4,7 @@ use std::error::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::emulator::memory::U16Wrapper;
+pub type Args<'a> = (Operands<'a>, Option<u8>);
 
 #[derive(Debug)]
 pub enum Operands<'a> {

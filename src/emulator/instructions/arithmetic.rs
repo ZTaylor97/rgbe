@@ -3,7 +3,7 @@ use crate::emulator::{
     memory::{Memory, U16Wrapper},
 };
 
-use super::utils::{BranchArgs, InstructionError, Operands, Ret, Word};
+use super::utils::{Args, BranchArgs, InstructionError, Operands, Ret, Word};
 
 pub fn add(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
     if let Operands::Two(target, source, flags) = operands {
@@ -249,7 +249,7 @@ pub fn get_arithmetic_operands<'a>(
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Result<(Operands<'a>, Option<u8>), InstructionError<'a>> {
+) -> Result<Args<'a>, InstructionError<'a>> {
     let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 

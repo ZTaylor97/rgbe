@@ -7,13 +7,14 @@ mod utils;
 
 use std::fs;
 
-use crate::emulator::instructions::increment::get_ncrement_operands;
+use crate::emulator::instructions::jump::get_jump_operands;
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use arithmetic::*;
 use increment::*;
+use jump::*;
 use load::*;
-use utils::{BranchArgs, InstructionData, InstructionError, Operands, Ret};
+use utils::{Args, BranchArgs, InstructionData, InstructionError, Operands, Ret};
 
 #[derive(Clone)]
 pub struct Instruction {
@@ -59,13 +60,14 @@ pub fn execute_instruction(
         opcode, instruction.data, registers.pc, registers.sp
     );
 
-    let get_operands_result: Result<(Operands, Option<u8>), InstructionError> =
+    let get_operands_result: Result<Args, InstructionError> =
         match instruction.data.mnemonic.as_str() {
             "LD" => get_ld_operands(registers, memory, opcode, value),
             "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
                 get_arithmetic_operands(registers, memory, opcode, value)
             }
             "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
+            "JP" | "JR" => get_jump_operands(registers, memory, opcode, value),
             _ => panic!(
                 "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
                 InstructionError::UnimplementedError(opcode),
@@ -119,6 +121,8 @@ pub fn fetch_instructions() -> Vec<Instruction> {
                 "CP" => cp,
                 "INC" => inc,
                 "DEC" => dec,
+                "JP" => jp,
+                "JR" => jr,
                 _ => nop,
             };
 

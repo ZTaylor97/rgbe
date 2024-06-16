@@ -1,6 +1,6 @@
 use num_traits::{ops::overflowing::OverflowingSub, WrappingAdd, WrappingSub};
 
-use super::utils::{BranchArgs, InstructionError, Operands, Ret, Word};
+use super::utils::{Args, BranchArgs, InstructionError, Operands, Ret, Word};
 use crate::emulator::{
     cpu::cpu_registers::CPURegisters,
     memory::{Memory, U16Wrapper},
@@ -81,7 +81,7 @@ pub fn get_ncrement_operands<'a>(
     mem: &'a mut Memory,
     opcode: u8,
     value: Option<Ret>,
-) -> Result<(Operands<'a>, Option<u8>), InstructionError<'a>> {
+) -> Result<Args<'a>, InstructionError<'a>> {
     let hl = registers.get_hl();
 
     let dest = match opcode {
