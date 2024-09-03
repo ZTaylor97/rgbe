@@ -4,6 +4,7 @@ mod increment;
 mod jump;
 mod load;
 mod utils;
+mod stack;
 
 use std::fs;
 
@@ -14,6 +15,7 @@ use arithmetic::*;
 use increment::*;
 use jump::*;
 use load::*;
+use stack::*;
 use utils::{Args, BranchArgs, InstructionData, InstructionError, Operands, Ret};
 
 #[derive(Clone)]
