@@ -32,19 +32,20 @@ pub fn get_stack_operands<'a>(
     opcode: u8,
     value: Option<Ret>,
 ) -> Result<Args<'a>, InstructionError<'a>> {
-    let hi = (opcode & 0xF0) >> 4;
-    let lo = opcode & 0x0F;
+    // let ops = match opcode {
+    //     0xC6 => Operands::Two(
+    //         Word::U16WrapperMut(U16Wrapper(
+    //             val1,
+    //             val2
+    //         )),
+    //         Word::U16(registers.get_bc()),
+    //         None,
+    //     ),
+    //     _ => return Err(InstructionError::UnimplementedError(opcode)),
+    // };
+    // Ok((ops, None))
 
-    let reg_copy = registers.clone();
-
-    let hl = registers.get_hl();
-    let mem_hl_val = mem.read_u8(hl).clone();
-
-    let dest = Word::U16Mut(&mut registers.pc);
-
-    match opcode {
-        _ => return Err(InstructionError::UnimplementedError(opcode)),
-    }
+    Err(InstructionError::UnimplementedError(0xFF))
 }
 
 #[cfg(test)]
@@ -79,6 +80,5 @@ mod stack_instruction_tests {
 
         let expected_values = convert_u16_to_two_u8s(source);
         assert_eq!(target, expected_values)
-
     }
 }

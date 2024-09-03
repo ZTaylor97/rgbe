@@ -37,7 +37,7 @@ impl EmulatorBuilder {
 
     pub fn cart(mut self, file_path: String) -> EmulatorBuilder {
         self.cart = Cart::load_rom(file_path);
-        self.memory.swap_rom(self.cart.get_bank(0));
+        // self.memory.swap_rom(self.cart.get_bank(0));
         self
     }
 
