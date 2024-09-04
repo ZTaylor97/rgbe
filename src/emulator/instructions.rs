@@ -65,6 +65,7 @@ pub fn execute_instruction(
 
     let get_operands_result: Result<Args, InstructionError> =
         match instruction.data.mnemonic.as_str() {
+            "NOP" => Ok((Operands::None, None)),
             "LD" => get_ld_operands(registers, memory, opcode, value),
             "ADD" | "ADC" | "SUB" | "SBC" | "XOR" | "OR" | "AND" | "CP" => {
                 get_arithmetic_operands(registers, memory, opcode, value)

@@ -6,6 +6,10 @@ pub struct Memory {
     buf: Buffer<0xFFFF>,
 }
 
+pub enum Partitions {
+    Rom0 = 0x0000
+}
+
 impl Memory {
     pub fn new() -> Self {
         Self::default()
@@ -33,6 +37,12 @@ impl Memory {
 
     pub fn read_u16wrapper(&mut self, address: u16) -> U16Wrapper {
         self.buf.read_u16wrapper(address)
+    }
+
+    pub fn load_cart(&mut self,rom_bank: Buffer<0x4000>, address: usize){
+
+        assert!(self.buf.buf.len() >= 0x4000);
+        self.buf.buf[..0x4000].copy_from_slice(&rom_bank.buf)
     }
 }
 

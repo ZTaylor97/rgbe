@@ -6,7 +6,7 @@ mod memory;
 
 use cart::Cart;
 use cpu::CPU;
-use memory::Memory;
+use memory::{Memory, Partitions};
 
 #[derive(Default)]
 pub struct Emulator {
@@ -37,7 +37,7 @@ impl EmulatorBuilder {
 
     pub fn cart(mut self, file_path: String) -> EmulatorBuilder {
         self.cart = Cart::load_rom(file_path);
-        // self.memory.swap_rom(self.cart.get_bank(0));
+        self.memory.load_cart(self.cart.get_bank(0), Partitions::Rom0 as usize);
         self
     }
 
