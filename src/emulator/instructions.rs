@@ -3,8 +3,8 @@ mod arithmetic;
 mod increment;
 mod jump;
 mod load;
-mod utils;
 mod stack;
+mod utils;
 
 use std::fs;
 
@@ -71,6 +71,7 @@ pub fn execute_instruction(
             }
             "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
             "JP" | "JR" => get_jump_operands(registers, memory, opcode, value),
+            "PUSH" | "POP" => get_stack_operands(registers, memory, opcode, value),
             _ => panic!(
                 "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
                 InstructionError::UnimplementedError(opcode),
@@ -124,6 +125,7 @@ pub fn fetch_instructions() -> Vec<Instruction> {
                 "DEC" => dec,
                 "JP" => jp,
                 "JR" => jr,
+                "PUSH" | "POP" => push_pop,
                 _ => nop,
             };
 
@@ -409,5 +411,70 @@ mod instruction_integration_tests {
 
         assert_eq!(registers.pc, 1);
         assert_eq!(registers.a, desired_result);
+    }
+
+    #[test]
+    fn test_execute_push_af_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: PUSH AF
+        let instruction = 0xF5;
+
+        memory.write_u8(0x0, instruction);
+        registers.a = 0x0F;
+        registers.f = 0xF0;
+
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 1);
+        assert_eq!(memory.read_u8(99), 0x0F);
+        assert_eq!(memory.read_u8(98), 0xF0);
+        assert_eq!(registers.sp, 98);
+    }
+    #[test]
+    fn test_execute_pop_bc_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+        // ensure pre-conditions
+        registers.b = 0x00;
+        registers.c = 0x00;
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: POP BC
+        let instruction = 0xC1;
+
+        memory.write_u8(0x0, instruction);
+
+        // write memory to be stored back into registers
+        memory.write_u8(registers.sp, 0x0F);
+        memory.write_u8(registers.sp + 1, 0xF0);
+
+        execute_instruction(
+            &instructions[instruction as usize],
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 1);
+        assert_eq!(registers.c, 0x0F);
+        assert_eq!(registers.b, 0xF0);
+        assert_eq!(registers.sp, 102);
     }
 }

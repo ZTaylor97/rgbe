@@ -38,7 +38,7 @@ pub fn get_stack_operands<'a>(
     let hi = (opcode & 0xF0) >> 4;
     let lo = opcode & 0x0F;
 
-    let source = match lo {
+    let source = match hi {
         0xC => U16Wrapper(&mut registers.b, &mut registers.c),
         0xD => U16Wrapper(&mut registers.d, &mut registers.e),
         0xE => U16Wrapper(&mut registers.h, &mut registers.l),
@@ -46,7 +46,7 @@ pub fn get_stack_operands<'a>(
         _ => return Err(InstructionError::UnimplementedError(opcode)),
     };
 
-    let ops = match hi {
+    let ops = match lo {
         0x5 => {
             registers.sp -= 2;
             Operands::Two(
