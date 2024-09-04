@@ -1,8 +1,9 @@
 #![allow(unused)]
 
 #[derive(Default)]
+
 pub struct Memory {
-    buf: Buffer<0xFFFF>
+    buf: Buffer<0xFFFF>,
 }
 
 impl Memory {
@@ -30,33 +31,8 @@ impl Memory {
         self.write_u8(address + 1, ((value & 0xff00) >> 8) as u8);
     }
 
-    // pub fn read_u16_as_mut_pair(&mut self, address: u16) -> U16Wrapper {
-    //         U16Wrapper(self.buf.buf.)
-    // }
-}
-
-// TODO: implement IO registers properly, might be worth putting them in another module
-pub struct IORegisters {
-    buf: [u8; 0x100],
-}
-impl Default for IORegisters {
-    fn default() -> Self {
-        Self { buf: [0; 0x100] }
-    }
-}
-impl ReadBuffer for IORegisters {
-    fn read_u8_mut(&mut self, address: u16) -> &mut u8 {
-        self.buf
-            .get_mut(address as usize)
-            .expect("Error reading Rom Buffer")
-    }
-    fn read_u8(&self, address: u16) -> u8 {
-        *self.buf.get(address as usize).expect("")
-    }
-}
-impl WriteBuffer for IORegisters {
-    fn write_u8(&mut self, address: u16, value: u8) {
-        self.buf[address as usize] = value;
+    pub fn read_u16wrapper(&mut self, address: u16) -> U16Wrapper {
+        self.buf.read_u16wrapper(address)
     }
 }
 
@@ -72,8 +48,15 @@ impl<const N: usize> ReadBuffer for Buffer<N> {
     fn read_u8_mut(&mut self, address: u16) -> &mut u8 {
         self.buf.get_mut(address as usize).expect("")
     }
+
     fn read_u8(&self, address: u16) -> u8 {
         self.buf.get(address as usize).expect("").clone()
+    }
+
+    fn read_u16wrapper(&mut self, address: u16) -> U16Wrapper {
+        let (left, right) = self.buf.split_at_mut(address as usize + 1);
+
+        U16Wrapper(left.last_mut().unwrap(), right.first_mut().unwrap())
     }
 }
 impl<const N: usize> WriteBuffer for Buffer<N> {
@@ -91,6 +74,7 @@ impl<const N: usize> WriteBuffer for Buffer<N> {
 
 pub trait ReadBuffer {
     fn read_u8_mut(&mut self, address: u16) -> &mut u8;
+    fn read_u16wrapper(&mut self, address: u16) -> U16Wrapper;
     fn read_u8(&self, address: u16) -> u8;
 }
 pub trait WriteBuffer {
@@ -113,6 +97,8 @@ impl<'a> U16Wrapper<'a> {
 
 #[cfg(test)]
 mod memory_tests {
+    use crate::emulator::memory::{ReadBuffer, U16Wrapper, WriteBuffer};
+
     use super::Memory;
 
     #[test]
@@ -122,7 +108,6 @@ mod memory_tests {
         test_memory.buf.buf[0x0000] = 69;
 
         assert_eq!(test_memory.read_u8(0x0000), 69);
-
     }
 
     #[test]
@@ -147,5 +132,24 @@ mod memory_tests {
         test_memory.write_u16(0, 0xAFFA);
         assert_eq!(test_memory.buf.buf[0], 0xFA);
         assert_eq!(test_memory.buf.buf[1], 0xAF);
+    }
+
+    #[test]
+    fn test_read_u16wrapper() {
+        let mut test_memory = Memory::new();
+        test_memory.write_u8(10, 0xF0);
+        test_memory.write_u8(11, 0x0F);
+
+        let U16Wrapper(val1, val2) = test_memory.read_u16wrapper(10);
+
+        // sanity check values returned from function
+        assert_eq!(*val1, 0xF0);
+        assert_eq!(*val2, 0x0F);
+
+        // test interior mutability
+        *val1 = 69;
+        *val2 = 99;
+        assert_eq!(test_memory.read_u8(10), 69);
+        assert_eq!(test_memory.read_u8(11), 99);
     }
 }
