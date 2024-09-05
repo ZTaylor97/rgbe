@@ -180,7 +180,7 @@ pub fn get_call_operands<'a>(
     };
 
     let ops = Operands::Call(
-        Word::U16WrapperMut(mem.read_u16wrapper(registers.sp)),
+        Word::U16WrapperMut(mem.read_u16wrapper(registers.sp - 2)),
         Word::U16Mut(&mut registers.pc),
         Word::U16Mut(&mut registers.sp),
         Word::U16(address), // jump here
@@ -413,7 +413,8 @@ mod stack_instruction_tests {
     fn test_call_condition_false() {
         let source = 30000;
         let mut target = convert_u16_to_two_u8s(source);
-        let mut pc = 0x6996;
+        let start_pc = 0x6996;
+        let mut pc = start_pc;
         let address = 0xFFFF;
         let mut flags = 0b1100_0000;
 
@@ -440,7 +441,7 @@ mod stack_instruction_tests {
             branch_args,
         );
 
-        assert_eq!(pc, 0x6996);
+        assert_eq!(pc, start_pc);
         assert_eq!(target, convert_u16_to_two_u8s(source));
         assert_eq!(stack_pointer, 10);
         assert_eq!(result_cycles, cycles[1]);

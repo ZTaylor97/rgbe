@@ -76,6 +76,7 @@ pub fn execute_instruction(
             "JP" | "JR" => get_jump_operands(registers, memory, opcode, value),
             "PUSH" | "POP"  => get_stack_operands(registers, memory, opcode, value),
             "RET" | "RETI" => get_ret_operands(registers, memory, opcode, value),
+            "CALL" => get_call_operands(registers, memory, opcode, value),
             _ => panic!(
                 "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
                 InstructionError::UnimplementedError(opcode),
@@ -131,6 +132,7 @@ pub fn fetch_instructions() -> Vec<Instruction> {
                 "JR" => jr,
                 "PUSH" | "POP" => push_pop,
                 "RET" | "RETI" => ret,
+                "CALL" => call,
                 _ => nop,
             };
 
@@ -146,8 +148,7 @@ pub fn nop(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, Instru
 #[cfg(test)]
 mod instruction_integration_tests {
     use crate::emulator::{
-        cpu::cpu_registers::{convert_u16_to_two_u8s, CPURegisters},
-        memory::Memory,
+        cpu::cpu_registers::{convert_u16_to_two_u8s, CPURegisters}, instructions::jump, memory::{Memory, U16Wrapper}
     };
 
     use super::{execute_instruction, fetch_instructions, Instruction};
@@ -570,6 +571,130 @@ mod instruction_integration_tests {
 
         assert_eq!(registers.pc, 1);
         assert_eq!(registers.sp, 100);
+        assert_eq!(cycles, instr.data.cycles[1])
+    }
+
+    #[test]
+    fn test_execute_call_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        let start_address = 0x44AA; 
+
+        // ensure pre-conditions
+        registers.pc = start_address;
+        registers.f = 0b0000_0000;
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: POP BC
+        let instruction = 0xCD;
+
+        let jump_address = 0x6996;
+        memory.write_u8(start_address, instruction);
+        memory.write_u16(start_address + 1, jump_address);
+
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
+            &mut registers,
+            &mut memory,
+        );
+
+        // Check that pc was written to stack
+        let stack_var= memory.read_u16(98);
+
+        assert_eq!(start_address + instr.data.bytes as u16, stack_var);
+        // Check pc was updated to input address
+        assert_eq!(registers.pc, jump_address);
+
+        // Ensure stack pointer was correctly incremented
+        assert_eq!(registers.sp, 98);
+        // Ensure cycles data is correct
+        assert_eq!(cycles, instr.data.cycles[0])
+    }
+    #[test]
+    fn test_execute_call_nz_true_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        let start_address = 0x44AA; 
+
+        // ensure pre-conditions
+        registers.pc = start_address;
+        registers.f = 0b1100_0000;
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: POP BC
+        let instruction = 0xC4;
+
+        let jump_address = 0x6996;
+        memory.write_u8(start_address, instruction);
+        memory.write_u16(start_address + 1, jump_address);
+
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
+            &mut registers,
+            &mut memory,
+        );
+
+        // Check that pc was written to stack
+        let stack_var= memory.read_u16(98);
+
+        assert_eq!(start_address + instr.data.bytes as u16, stack_var);
+        // Check pc was updated to input address
+        assert_eq!(registers.pc, jump_address);
+
+        // Ensure stack pointer was correctly incremented
+        assert_eq!(registers.sp, 98);
+        // Ensure cycles data is correct
+        assert_eq!(cycles, instr.data.cycles[0])
+    }
+    #[test]
+    fn test_execute_call_nz_false_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        let start_address = 0x44AA; 
+
+        // ensure pre-conditions
+        registers.pc = start_address;
+        registers.f = 0b0000_0000;
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: POP BC
+        let instruction = 0xC4;
+
+        let jump_address = 0x6996;
+        memory.write_u8(start_address, instruction);
+        memory.write_u16(start_address + 1, jump_address);
+
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
+            &mut registers,
+            &mut memory,
+        );
+
+        // Check that pc was written to stack
+        let stack_var= memory.read_u16(98);
+
+        assert_eq!(0, stack_var);
+        // Check pc was updated to input address
+        assert_eq!(registers.pc, start_address+instr.data.bytes as u16);
+
+        // Ensure stack pointer was correctly incremented
+        assert_eq!(registers.sp, 100);
+        // Ensure cycles data is correct
         assert_eq!(cycles, instr.data.cycles[1])
     }
 }
