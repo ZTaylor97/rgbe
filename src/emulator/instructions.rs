@@ -428,7 +428,7 @@ mod instruction_integration_tests {
         let instruction = 0xCA;
 
         memory.write_u8(0x0, instruction);
-        memory.write_u16(0x1, 0xAFAF);
+        memory.write_u16(0x1, 0xAFAF); // write jp destination for instruction to read
         registers.f = 0b0000_0000; // condition should result in false
 
         let instr = &instructions[instruction as usize];
