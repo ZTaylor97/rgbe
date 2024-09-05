@@ -17,7 +17,7 @@ pub fn ld(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, Instruc
             (Word::U16Mut(target), Word::U16(source)) => *target = source,
             (word1, word2) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
-                    "Incorrect words {:?} , {:?} passed to add function ld",
+                    "Incorrect words {:?} , {:?} passed to load function ld",
                     word1, word2
                 )));
             }
@@ -76,22 +76,14 @@ pub fn get_ld_operands<'a>(
         };
 
         let ops = match lo {
-            0x0 => Operands::Two(dest, Word::U8(reg_copy.b), None),
-            0x1 => Operands::Two(dest, Word::U8(reg_copy.c), None),
-            0x2 => Operands::Two(dest, Word::U8(reg_copy.d), None),
-            0x3 => Operands::Two(dest, Word::U8(reg_copy.e), None),
-            0x4 => Operands::Two(dest, Word::U8(reg_copy.h), None),
-            0x5 => Operands::Two(dest, Word::U8(reg_copy.l), None),
-            0x6 => Operands::Two(dest, Word::U8(mem_hl_val), None),
-            0x7 => Operands::Two(dest, Word::U8(reg_copy.a), None),
-            0x8 => Operands::Two(dest, Word::U8(reg_copy.b), None),
-            0x9 => Operands::Two(dest, Word::U8(reg_copy.c), None),
-            0xA => Operands::Two(dest, Word::U8(reg_copy.d), None),
-            0xB => Operands::Two(dest, Word::U8(reg_copy.e), None),
-            0xC => Operands::Two(dest, Word::U8(reg_copy.h), None),
-            0xD => Operands::Two(dest, Word::U8(reg_copy.l), None),
-            0xE => Operands::Two(dest, Word::U8(mem_hl_val), None),
-            0xF => Operands::Two(dest, Word::U8(reg_copy.a), None),
+            0x0 | 0x8 => Operands::Two(dest, Word::U8(reg_copy.b), None),
+            0x1 | 0x9 => Operands::Two(dest, Word::U8(reg_copy.c), None),
+            0x2 | 0xA => Operands::Two(dest, Word::U8(reg_copy.d), None),
+            0x3 | 0xB => Operands::Two(dest, Word::U8(reg_copy.e), None),
+            0x4 | 0xC => Operands::Two(dest, Word::U8(reg_copy.h), None),
+            0x5 | 0xD => Operands::Two(dest, Word::U8(reg_copy.l), None),
+            0x6 | 0xE => Operands::Two(dest, Word::U8(mem_hl_val), None),
+            0x7 | 0xF => Operands::Two(dest, Word::U8(reg_copy.a), None),
             _ => return Err(InstructionError::UnimplementedError(opcode)),
         };
         Ok((ops, None))
@@ -161,17 +153,13 @@ pub fn get_ld_operands<'a>(
                     ),
                     0x2 => {
                         let hl = registers.get_hl();
-                        let ops =
-                            Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source), None);
                         registers.set_hl(hl + 1);
-                        ops
+                        Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source), None)
                     }
                     0x3 => {
                         let hl = registers.get_hl();
-                        let ops =
-                            Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source), None);
                         registers.set_hl(hl - 1);
-                        ops
+                        Operands::Two(Word::U8Mut(mem.read_u8_mut(hl)), Word::U8(source), None)
                     }
                     0xE => Operands::Two(
                         Word::U8Mut(mem.read_u8_mut(registers.c as u16)),
@@ -233,22 +221,20 @@ pub fn get_ld_operands<'a>(
                 0x2 => {
                     let hl = reg_copy.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops = Operands::Two(
+                    Operands::Two(
                         Word::U8Mut(&mut registers.a),
                         Word::U8(mem.read_u8(hl)),
                         None,
-                    );
-                    ops
+                    )
                 }
                 0x3 => {
                     let hl = registers.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops = Operands::Two(
+                    Operands::Two(
                         Word::U8Mut(&mut registers.a),
                         Word::U8(mem.read_u8(hl)),
                         None,
-                    );
-                    ops
+                    )
                 }
                 0xE => {
                     let value: u16 = if let Some(Ret::U16(x)) = value {
@@ -293,22 +279,20 @@ pub fn get_ld_operands<'a>(
                 0x2 => {
                     let hl = reg_copy.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops = Operands::Two(
+                    Operands::Two(
                         Word::U8Mut(&mut registers.l),
                         Word::U8(mem.read_u8(hl)),
                         None,
-                    );
-                    ops
+                    )
                 }
                 0x3 => {
                     let hl = registers.get_hl();
                     registers.set_hl(hl + 1);
-                    let ops = Operands::Two(
+                    Operands::Two(
                         Word::U8Mut(&mut registers.a),
                         Word::U8(mem.read_u8(hl)),
                         None,
-                    );
-                    ops
+                    )
                 }
                 _ => return Err(InstructionError::UnimplementedError(opcode)),
             },
