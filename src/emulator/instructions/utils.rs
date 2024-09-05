@@ -11,6 +11,7 @@ pub enum Operands<'a> {
     None,
     One(Word<'a>, Option<&'a mut u8>),
     Two(Word<'a>, Word<'a>, Option<&'a mut u8>),
+    Ret(Word<'a>, Word<'a>,Word<'a>, Option<&'a mut u8>),
 }
 
 #[derive(Debug)]

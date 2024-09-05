@@ -30,13 +30,14 @@ pub fn push_pop(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, I
 }
 
 pub fn ret(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
-    if let Operands::Two(target, source, flags) = operands {
-        match (target, source) {
-            (Word::U16Mut(target), Word::U16WrapperMut(source)) => {
+    if let Operands::Ret(target, source,sp , flags) = operands {
+        match (target, source, sp) {
+            (Word::U16Mut(target), Word::U16WrapperMut(source), Word::U16Mut(sp)) => {
                 if let Some(condition) = branch_args.condition {
                     if check_condition(*flags.unwrap(), condition) {
                         let new_source = U16Wrapper(source.1, source.0);
                         *target = new_source.into_u16();
+                        *sp +=2;
                         Ok(branch_args.cycles[0])
                     } else {
                         Ok(branch_args.cycles[1])
@@ -44,14 +45,15 @@ pub fn ret(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, Instru
                 } else {
                     let new_source = U16Wrapper(source.1, source.0);
                     *target = new_source.into_u16();
+                    *sp +=2;
                     Ok(branch_args.cycles[0])
                 }
 
             }
-            (word1, word2) => {
+            (word1, word2, word3) => {
                 return Err(InstructionError::IncorrectOperandsError(format!(
-                    "Incorrect words {:?} , {:?} passed to jump function",
-                    word1, word2
+                    "Incorrect words {:?} , {:?}, {:?} passed to jump function",
+                    word1, word2, word3
                 )));
             }
         }
@@ -108,10 +110,11 @@ pub fn get_ret_operands<'a>(
     opcode: u8,
     value: Option<Ret>,
 ) -> Result<Args<'a>, InstructionError<'a>> {
-    let ops = Operands::Two(
+    let ops = Operands::Ret(
         Word::U16Mut(&mut registers.pc),
         Word::U16WrapperMut(mem.read_u16wrapper(registers.sp)),
-        None,
+        Word::U16Mut(&mut registers.sp),
+        Some(&mut registers.f),
     );
     let condition = match opcode {
         0xC0 => Some(0b1100_0000), // RET NZ
@@ -122,7 +125,6 @@ pub fn get_ret_operands<'a>(
         0xD9 => None, // RETI
         _ => return Err(InstructionError::UnimplementedError(opcode)),
     };
-    registers.sp += 2;
     Ok((ops, condition))
 }
 
@@ -176,10 +178,13 @@ mod stack_instruction_tests {
             condition: None,
         };
 
+        let mut stack_pointer = 0;
+
         instruction.exec(
-            Operands::Two(
+            Operands::Ret(
                 Word::U16Mut(&mut target),
                 Word::U16WrapperMut(U16Wrapper(&mut expected_values.0, &mut expected_values.1)),
+                Word::U16Mut(&mut stack_pointer),
                 None,
             ),
             branch_args,
@@ -188,6 +193,8 @@ mod stack_instruction_tests {
         assert_eq!(
             target,
             convert_two_u8s_to_u16(expected_values.1, expected_values.0)
-        )
+        );
+
+        assert_eq!(stack_pointer, 2);
     }
 }

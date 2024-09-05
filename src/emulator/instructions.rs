@@ -506,4 +506,70 @@ mod instruction_integration_tests {
         assert_eq!(registers.b, 0xF0);
         assert_eq!(registers.sp, 102);
     }
+    #[test]
+    fn test_execute_ret_nz_true_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        // ensure pre-conditions
+        registers.pc = 0x0000;
+        registers.f = 0b1100_0000;
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: POP BC
+        let instruction = 0xC0;
+
+        memory.write_u8(0x0, instruction);
+
+        // write memory to be stored back into registers
+        memory.write_u8(registers.sp, 0x0F);
+        memory.write_u8(registers.sp + 1, 0xF0);
+
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 0xF00F);
+        assert_eq!(registers.sp, 102);
+        assert_eq!(cycles, instr.data.cycles[0])
+    }
+    #[test]
+    fn test_execute_ret_nz_false_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        // ensure pre-conditions
+        registers.pc = 0x0000;
+        registers.f = 0b0000_0000;
+
+        // point sp at unused memory
+        registers.sp = 100;
+
+        // First instruction should be: POP BC
+        let instruction = 0xC0;
+
+        memory.write_u8(0x0, instruction);
+
+        // write memory to be stored back into registers
+        memory.write_u8(registers.sp, 0x0F);
+        memory.write_u8(registers.sp + 1, 0xF0);
+
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 1);
+        assert_eq!(registers.sp, 100);
+        assert_eq!(cycles, instr.data.cycles[1])
+    }
 }
