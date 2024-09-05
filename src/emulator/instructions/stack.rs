@@ -352,7 +352,7 @@ mod stack_instruction_tests {
             func: call,
         };
         let branch_args = BranchArgs {
-            cycles: vec![4],
+            cycles: vec![16,4],
             condition: None,
         };
 
@@ -372,5 +372,77 @@ mod stack_instruction_tests {
         assert_eq!(pc, address);
         assert_eq!(target, (0x96, 0x69));
         assert_eq!(stack_pointer, 8);
+    }
+    #[test]
+    fn test_call_condition_true() {
+        let source = 30000;
+        let mut target = convert_u16_to_two_u8s(source);
+        let mut pc = 0x6996;
+        let address = 0xFFFF;
+        let mut flags = 0b1100_0000;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: call,
+        };
+        let cycles = vec![16,4];
+        let branch_args = BranchArgs {
+            cycles: cycles.clone(),
+            condition: Some(flags),
+        };
+
+        let mut stack_pointer = 10;
+
+        let result_cycles = instruction.exec(
+            Operands::Call(
+                Word::U16WrapperMut(U16Wrapper(&mut target.0, &mut target.1)),
+                Word::U16Mut(&mut pc),
+                Word::U16Mut(&mut stack_pointer),
+                Word::U16(address),
+                Some(&mut flags),
+            ),
+            branch_args,
+        );
+
+        assert_eq!(pc, address);
+        assert_eq!(target, (0x96, 0x69));
+        assert_eq!(stack_pointer, 8);
+        assert_eq!(result_cycles, cycles[0]);
+    }
+    #[test]
+    fn test_call_condition_false() {
+        let source = 30000;
+        let mut target = convert_u16_to_two_u8s(source);
+        let mut pc = 0x6996;
+        let address = 0xFFFF;
+        let mut flags = 0b1100_0000;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: call,
+        };
+        let cycles = vec![16,4];
+        let branch_args = BranchArgs {
+            cycles: cycles.clone(),
+            condition: Some(0b1111_0000),
+        };
+
+        let mut stack_pointer = 10;
+
+        let result_cycles = instruction.exec(
+            Operands::Call(
+                Word::U16WrapperMut(U16Wrapper(&mut target.0, &mut target.1)),
+                Word::U16Mut(&mut pc),
+                Word::U16Mut(&mut stack_pointer),
+                Word::U16(address),
+                Some(&mut flags),
+            ),
+            branch_args,
+        );
+
+        assert_eq!(pc, 0x6996);
+        assert_eq!(target, convert_u16_to_two_u8s(source));
+        assert_eq!(stack_pointer, 10);
+        assert_eq!(result_cycles, cycles[1]);
     }
 }
