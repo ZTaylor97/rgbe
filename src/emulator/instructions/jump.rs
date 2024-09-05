@@ -3,7 +3,7 @@ use num_traits::{
     WrappingAdd, WrappingSub,
 };
 
-use super::utils::{Args, BranchArgs, InstructionError, Operands, Ret, Word};
+use super::utils::{check_condition, Args, BranchArgs, InstructionError, Operands, Ret, Word};
 use crate::emulator::{
     cpu::cpu_registers::CPURegisters,
     memory::{Memory, U16Wrapper},
@@ -14,7 +14,7 @@ pub fn jp(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, Instruc
         match (target, source) {
             (Word::U16Mut(target), Word::U16(source)) => {
                 if let Some(condition) = branch_args.condition {
-                    if jp_check_condition(*flags.unwrap(), condition) {
+                    if check_condition(*flags.unwrap(), condition) {
                         *target = source;
 
                         Ok(branch_args.cycles[0])
@@ -43,7 +43,7 @@ pub fn jr(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, Instruc
         match (target, source) {
             (Word::U16Mut(target), Word::U8(source)) => {
                 if let Some(condition) = branch_args.condition {
-                    if jp_check_condition(*flags.unwrap(), condition) {
+                    if check_condition(*flags.unwrap(), condition) {
                         let val = target.wrapping_add_signed((source as i8) as i16);
                         *target = val;
 
@@ -69,9 +69,6 @@ pub fn jr(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, Instruc
     }
 }
 
-pub fn jp_check_condition(flags: u8, condition: u8) -> bool {
-    (flags & condition) == condition
-}
 
 pub fn get_jump_operands<'a>(
     registers: &'a mut CPURegisters,
@@ -99,7 +96,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U16(address), None),
+                Operands::Two(dest, Word::U16(address), Some(&mut registers.f)),
                 Some(0b1100_0000),
             ))
         }
@@ -111,7 +108,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U16(address), None),
+                Operands::Two(dest, Word::U16(address), Some(&mut registers.f)),
                 Some(0b0101_0000),
             ))
         }
@@ -132,7 +129,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U16(address), None),
+                Operands::Two(dest, Word::U16(address), Some(&mut registers.f)),
                 Some(0b1000_0000),
             ))
         }
@@ -144,7 +141,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U16(address), None),
+                Operands::Two(dest, Word::U16(address), Some(&mut registers.f)),
                 Some(0b0001_0000),
             ))
         }
@@ -161,7 +158,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U8(address), None),
+                Operands::Two(dest, Word::U8(address), Some(&mut registers.f)),
                 Some(0b1100_0000),
             ))
         }
@@ -173,7 +170,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U8(address), None),
+                Operands::Two(dest, Word::U8(address), Some(&mut registers.f)),
                 Some(0b0101_0000),
             ))
         }
@@ -184,7 +181,7 @@ pub fn get_jump_operands<'a>(
             } else {
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
-            Ok((Operands::Two(dest, Word::U8(address), None), None))
+            Ok((Operands::Two(dest, Word::U8(address), Some(&mut registers.f)), None))
         }
         0x28 => {
             // jr Z
@@ -194,7 +191,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U8(address), None),
+                Operands::Two(dest, Word::U8(address), Some(&mut registers.f)),
                 Some(0b1000_0000),
             ))
         }
@@ -206,7 +203,7 @@ pub fn get_jump_operands<'a>(
                 return Err(InstructionError::InvalidLiteral(value.unwrap()));
             };
             Ok((
-                Operands::Two(dest, Word::U8(address), None),
+                Operands::Two(dest, Word::U8(address), Some(&mut registers.f)),
                 Some(0b0001_0000),
             ))
         }

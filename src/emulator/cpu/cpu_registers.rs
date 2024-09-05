@@ -14,7 +14,9 @@ pub struct CPURegisters {
 
 impl CPURegisters {
     pub fn new() -> Self {
-        CPURegisters::default()
+        let mut reg = CPURegisters::default();
+        reg.pc = 0x100;
+        reg
     }
     pub fn get_af(&self) -> u16 {
         convert_two_u8s_to_u16(self.a, self.f)

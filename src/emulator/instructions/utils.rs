@@ -93,3 +93,8 @@ impl<'a> fmt::Display for InstructionError<'a> {
 }
 
 impl<'a> Error for InstructionError<'a> {}
+
+
+pub fn check_condition(flags: u8, condition: u8) -> bool {
+    (flags & condition) == condition
+}

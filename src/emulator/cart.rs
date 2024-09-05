@@ -3,7 +3,6 @@ use std::{fs::File, io::Read};
 
 use super::memory::Buffer;
 
-// TODO: carts may need to keep track of swappable bank state
 #[derive(Default)]
 pub struct Cart {
     buf: Vec<u8>,

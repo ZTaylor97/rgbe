@@ -14,7 +14,7 @@ pub struct CPU {
 impl Default for CPU {
     fn default() -> Self {
         Self {
-            registers: CPURegisters::default(),
+            registers: CPURegisters::new(),
             instructions: vec![],
         }
     }

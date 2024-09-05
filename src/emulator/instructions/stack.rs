@@ -3,7 +3,7 @@ use num_traits::{
     WrappingAdd, WrappingSub,
 };
 
-use super::utils::{Args, BranchArgs, InstructionError, Operands, Ret, Word};
+use super::utils::{check_condition, Args, BranchArgs, InstructionError, Operands, Ret, Word};
 use crate::emulator::{
     cpu::cpu_registers::CPURegisters,
     memory::{Memory, U16Wrapper},
@@ -29,6 +29,37 @@ pub fn push_pop(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, I
     Ok(branch_args.cycles[0])
 }
 
+pub fn ret(operands: Operands<'_>, branch_args: BranchArgs) -> Result<u8, InstructionError> {
+    if let Operands::Two(target, source, flags) = operands {
+        match (target, source) {
+            (Word::U16Mut(target), Word::U16WrapperMut(source)) => {
+                if let Some(condition) = branch_args.condition {
+                    if check_condition(*flags.unwrap(), condition) {
+                        let new_source = U16Wrapper(source.1, source.0);
+                        *target = new_source.into_u16();
+                        Ok(branch_args.cycles[0])
+                    } else {
+                        Ok(branch_args.cycles[1])
+                    }
+                } else {
+                    let new_source = U16Wrapper(source.1, source.0);
+                    *target = new_source.into_u16();
+                    Ok(branch_args.cycles[0])
+                }
+
+            }
+            (word1, word2) => {
+                return Err(InstructionError::IncorrectOperandsError(format!(
+                    "Incorrect words {:?} , {:?} passed to jump function",
+                    word1, word2
+                )));
+            }
+        }
+    } else {
+        return Err(InstructionError::InvalidOperandsError(operands));
+    }
+}
+
 pub fn get_stack_operands<'a>(
     registers: &'a mut CPURegisters,
     mem: &'a mut Memory,
@@ -47,6 +78,7 @@ pub fn get_stack_operands<'a>(
     };
 
     let ops = match lo {
+        // push
         0x5 => {
             registers.sp -= 2;
             Operands::Two(
@@ -55,6 +87,7 @@ pub fn get_stack_operands<'a>(
                 None,
             )
         }
+        // pop
         0x1 => {
             let ops = Operands::Two(
                 Word::U16WrapperMut(source),
@@ -69,10 +102,36 @@ pub fn get_stack_operands<'a>(
     Ok((ops, None))
 }
 
+pub fn get_ret_operands<'a>(
+    registers: &'a mut CPURegisters,
+    mem: &'a mut Memory,
+    opcode: u8,
+    value: Option<Ret>,
+) -> Result<Args<'a>, InstructionError<'a>> {
+    let ops = Operands::Two(
+        Word::U16Mut(&mut registers.pc),
+        Word::U16WrapperMut(mem.read_u16wrapper(registers.sp)),
+        None,
+    );
+    let condition = match opcode {
+        0xC0 => Some(0b1100_0000), // RET NZ
+        0xC8 => Some(0b1000_0000), // RET Z
+        0xC9 => None, // RET
+        0xD0 => Some(0b0101_0000), // RET NC
+        0xD8 => Some(0b0001_0000), // RET C
+        0xD9 => None, // RETI
+        _ => return Err(InstructionError::UnimplementedError(opcode)),
+    };
+    registers.sp += 2;
+    Ok((ops, condition))
+}
+
 #[cfg(test)]
 mod stack_instruction_tests {
     use crate::emulator::{
-        cpu::cpu_registers::convert_u16_to_two_u8s, instructions::*, memory::U16Wrapper,
+        cpu::cpu_registers::{convert_two_u8s_to_u16, convert_u16_to_two_u8s},
+        instructions::*,
+        memory::U16Wrapper,
     };
     use utils::Word;
 
@@ -100,6 +159,35 @@ mod stack_instruction_tests {
             branch_args,
         );
 
-        assert_eq!( target, (expected_values.1,expected_values.0))
+        assert_eq!(target, (expected_values.1, expected_values.0))
+    }
+    #[test]
+    fn test_ret() {
+        let source = 30000;
+        let mut expected_values = convert_u16_to_two_u8s(source);
+        let mut target = 100;
+
+        let instruction = Instruction {
+            data: InstructionData::default(),
+            func: ret,
+        };
+        let branch_args = BranchArgs {
+            cycles: vec![4],
+            condition: None,
+        };
+
+        instruction.exec(
+            Operands::Two(
+                Word::U16Mut(&mut target),
+                Word::U16WrapperMut(U16Wrapper(&mut expected_values.0, &mut expected_values.1)),
+                None,
+            ),
+            branch_args,
+        );
+
+        assert_eq!(
+            target,
+            convert_two_u8s_to_u16(expected_values.1, expected_values.0)
+        )
     }
 }

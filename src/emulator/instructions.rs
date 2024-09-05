@@ -8,7 +8,7 @@ mod utils;
 
 use std::fs;
 
-use crate::emulator::instructions::jump::get_jump_operands;
+use crate::emulator::instructions::{self, jump::get_jump_operands};
 
 use super::{cpu::cpu_registers::CPURegisters, memory::Memory};
 use arithmetic::*;
@@ -18,7 +18,7 @@ use load::*;
 use stack::*;
 use utils::{Args, BranchArgs, InstructionData, InstructionError, Operands, Ret};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Instruction {
     pub data: InstructionData,
     func: fn(Operands, BranchArgs) -> Result<u8, InstructionError>,
@@ -63,6 +63,8 @@ pub fn execute_instruction(
     );
     registers.pc += (instruction.data.bytes) as u16;
 
+    println!("{:?}", instruction);
+
     let get_operands_result: Result<Args, InstructionError> =
         match instruction.data.mnemonic.as_str() {
             "NOP" => Ok((Operands::None, None)),
@@ -72,7 +74,8 @@ pub fn execute_instruction(
             }
             "INC" | "DEC" => get_ncrement_operands(registers, memory, opcode, value),
             "JP" | "JR" => get_jump_operands(registers, memory, opcode, value),
-            "PUSH" | "POP" => get_stack_operands(registers, memory, opcode, value),
+            "PUSH" | "POP"  => get_stack_operands(registers, memory, opcode, value),
+            "RET" | "RETI" => get_ret_operands(registers, memory, opcode, value),
             _ => panic!(
                 "{}:\n\tInstruction Data - {:?}\n\tPC - {}\n\tSP - {}",
                 InstructionError::UnimplementedError(opcode),
@@ -127,6 +130,7 @@ pub fn fetch_instructions() -> Vec<Instruction> {
                 "JP" => jp,
                 "JR" => jr,
                 "PUSH" | "POP" => push_pop,
+                "RET" | "RETI" => ret,
                 _ => nop,
             };
 
@@ -388,30 +392,54 @@ mod instruction_integration_tests {
         assert_eq!(registers.a, desired_result);
     }
     #[test]
-    fn test_execute_jp_zc_instruction() {
+    fn test_execute_jp_z_true_instruction() {
         let mut registers = CPURegisters::default();
         let mut memory = Memory::default();
         let instructions: Vec<Instruction> = fetch_instructions();
 
         assert_eq!(registers.pc, 0);
 
-        // First instruction should be: LD A, [a16]
-        let instruction = 0x98;
+        // First instruction should be: JP Z a16
+        let instruction = 0xCA;
 
         memory.write_u8(0x0, instruction);
-        registers.a = 30;
-        registers.b = 20;
+        memory.write_u16(0x1, 0xAFAF);
+        registers.f = 0b1000_0000;
 
-        let desired_result: u8 = registers.a - registers.b;
-
-        execute_instruction(
-            &instructions[instruction as usize],
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
             &mut registers,
             &mut memory,
         );
 
-        assert_eq!(registers.pc, 1);
-        assert_eq!(registers.a, desired_result);
+        assert_eq!(registers.pc, 0xAFAF);
+        assert_eq!(cycles, instr.data.cycles[0])
+    }
+    #[test]
+    fn test_execute_jp_z_false_instruction() {
+        let mut registers = CPURegisters::default();
+        let mut memory = Memory::default();
+        let instructions: Vec<Instruction> = fetch_instructions();
+
+        assert_eq!(registers.pc, 0);
+
+        // First instruction should be: JP Z a16
+        let instruction = 0xCA;
+
+        memory.write_u8(0x0, instruction);
+        memory.write_u16(0x1, 0xAFAF);
+        registers.f = 0b0000_0000; // condition should result in false
+
+        let instr = &instructions[instruction as usize];
+        let cycles = execute_instruction(
+            instr,
+            &mut registers,
+            &mut memory,
+        );
+
+        assert_eq!(registers.pc, 3);
+        assert_eq!(cycles, instr.data.cycles[1])
     }
 
     #[test]
