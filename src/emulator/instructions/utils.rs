@@ -11,8 +11,10 @@ pub enum Operands<'a> {
     None,
     One(Word<'a>, Option<&'a mut u8>),
     Two(Word<'a>, Word<'a>, Option<&'a mut u8>),
-    Ret(Word<'a>, Word<'a>,Word<'a>, Option<&'a mut u8>),
+    Ret(Word<'a>, Word<'a>, Word<'a>, Option<&'a mut u8>), // Special case for RET instruction
+    Call(Word<'a>, Word<'a>, Word<'a>, Word<'a>, Option<&'a mut u8>), // Special case for CALL instruction
 }
+
 
 #[derive(Debug)]
 pub enum Word<'a> {
@@ -94,7 +96,6 @@ impl<'a> fmt::Display for InstructionError<'a> {
 }
 
 impl<'a> Error for InstructionError<'a> {}
-
 
 pub fn check_condition(flags: u8, condition: u8) -> bool {
     (flags & condition) == condition
