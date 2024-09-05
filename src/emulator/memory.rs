@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::{fs, io::{Read, Write}};
+
 #[derive(Default)]
 
 pub struct Memory {
@@ -7,12 +9,35 @@ pub struct Memory {
 }
 
 pub enum Partitions {
-    Rom0 = 0x0000
+    Rom0 = 0x0000,
 }
 
 impl Memory {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn serialize(&mut self, save_directory: String) -> Result<String, ()> {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(format!("{save_directory}/01.rgbe.sav"))
+            .unwrap();
+
+        file.write_all(&self.buf.buf);
+
+        Ok(format!("{save_directory}/01.rgbe.sav"))
+    }
+
+    pub fn deserialize(load_directory: String) -> Self {
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .open(format!("{load_directory}/01.rgbe.sav"))
+            .unwrap();
+        let mut mem = Memory::new();
+        file.read(&mut mem.buf.buf);
+
+        mem
     }
 
     pub fn read_u8_mut(&mut self, address: u16) -> &mut u8 {
@@ -39,8 +64,7 @@ impl Memory {
         self.buf.read_u16wrapper(address)
     }
 
-    pub fn load_cart(&mut self,rom_bank: Buffer<0x4000>, address: usize){
-
+    pub fn load_cart(&mut self, rom_bank: Buffer<0x4000>, address: usize) {
         assert!(self.buf.buf.len() >= 0x4000);
         self.buf.buf[..0x4000].copy_from_slice(&rom_bank.buf)
     }
@@ -161,5 +185,26 @@ mod memory_tests {
         *val2 = 99;
         assert_eq!(test_memory.read_u8(10), 69);
         assert_eq!(test_memory.read_u8(11), 99);
+    }
+
+    #[test]
+    fn test_serialize() {
+        let mut test_memory= Memory::new();
+        test_memory.write_u8(10, 0xF0);
+        test_memory.write_u8(11, 0x0F);
+
+        test_memory.serialize(String::from("/home/ztaylor97/proj/rgbe"));
+    }
+    #[test]
+    fn test_serialize_deserialize() {
+        let mut test_memory= Memory::new();
+        test_memory.write_u8(10, 0xF0);
+        test_memory.write_u8(11, 0x0F);
+        test_memory.serialize(String::from("/home/ztaylor97/proj/rgbe"));
+
+        let new_memory = Memory::deserialize(String::from("/home/ztaylor97/proj/rgbe"));
+
+        assert_eq!(new_memory.read_u8(10), 0xF0);
+        assert_eq!(new_memory.read_u8(11), 0x0F);
     }
 }
