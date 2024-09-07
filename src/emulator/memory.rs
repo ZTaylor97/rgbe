@@ -1,6 +1,9 @@
 #![allow(unused)]
 
-use std::{fs, io::{Read, Write}};
+use std::{
+    fs,
+    io::{Read, Write},
+};
 
 #[derive(Default)]
 
@@ -189,7 +192,7 @@ mod memory_tests {
 
     #[test]
     fn test_serialize() {
-        let mut test_memory= Memory::new();
+        let mut test_memory = Memory::new();
         test_memory.write_u8(10, 0xF0);
         test_memory.write_u8(11, 0x0F);
 
@@ -197,7 +200,7 @@ mod memory_tests {
     }
     #[test]
     fn test_serialize_deserialize() {
-        let mut test_memory= Memory::new();
+        let mut test_memory = Memory::new();
         test_memory.write_u8(10, 0xF0);
         test_memory.write_u8(11, 0x0F);
         test_memory.serialize(String::from("/home/ztaylor97/proj/rgbe"));

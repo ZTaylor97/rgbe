@@ -352,7 +352,7 @@ mod stack_instruction_tests {
             func: call,
         };
         let branch_args = BranchArgs {
-            cycles: vec![16,4],
+            cycles: vec![16, 4],
             condition: None,
         };
 
@@ -385,7 +385,7 @@ mod stack_instruction_tests {
             data: InstructionData::default(),
             func: call,
         };
-        let cycles = vec![16,4];
+        let cycles = vec![16, 4];
         let branch_args = BranchArgs {
             cycles: cycles.clone(),
             condition: Some(flags),
@@ -422,7 +422,7 @@ mod stack_instruction_tests {
             data: InstructionData::default(),
             func: call,
         };
-        let cycles = vec![16,4];
+        let cycles = vec![16, 4];
         let branch_args = BranchArgs {
             cycles: cycles.clone(),
             condition: Some(0b1111_0000),
